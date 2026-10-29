@@ -333,10 +333,10 @@ export function updateState(id, key, state) {
 }
 
 // ---------- 送信 ----------
-// まとめて保存：回答が BATCH_SIZE 件たまったら、または最後の操作から IDLE_MS たったら送る。
-// ほかに、セットの終わり・ホームに戻ったとき・アプリを閉じたときにも送る（app.js から syncNow を呼ぶ）
-const BATCH_SIZE = 10;
-const IDLE_MS = 120000;
+// まとめて保存：学習中は送らず、セットの終わり・ホームに戻ったとき・アプリを閉じたときに送る（app.js から syncNow）。
+// 念のため、回答が BATCH_SIZE 件たまったとき、または最後の操作から IDLE_MS たったときにも送る
+const BATCH_SIZE = 50; // 念のため：これだけたまったら学習の途中でも送る
+const IDLE_MS = 5 * 60 * 1000; // 操作がないまま5分たったら送る
 let lazyTimer = null;
 
 export function queueSync() {

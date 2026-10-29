@@ -93,6 +93,8 @@ function go(screen) {
 // ---------- 保存状態の表示 ----------
 function renderSave(s = store.status()) {
   if (!me() && s.mode === 'local') { $save.innerHTML = ''; return; }
+  // 学習中は保存しない（あとでまとめて送る）ので、気が散らないよう保存状態を表示しない
+  if (ui.screen === 'quiz') { $save.innerHTML = ''; return; }
   let html;
   if (!s.storageOk) html = '<span class="dot err"></span>この端末に保存できません';
   else if (s.mode === 'local') html = '<span class="dot local"></span>この端末だけに保存中';
@@ -749,7 +751,7 @@ function screenSettings() {
       : st.phase === 'offline' ? `オフライン。${st.pending ? `${st.pending}件をこの端末に一時保存し、インターネットにつながったら自動で送ります` : '送り残しはありません'}`
       : st.phase === 'error' ? `未保存 ${st.pending}件（${esc(st.message)}）。自動で再試行します`
       : st.pending ? `送信待ち ${st.pending}件` : 'クラウドに保存済み'}</p>
-    ${st.mode === 'remote' ? '<p class="muted small">記録は端末にためておき、まとめてクラウドに保存します（10問ごと・セットの終わり・ホームに戻ったとき・アプリを閉じたとき）。インターネットにつながっていないときは、つながったら自動で送ります。</p>' : ''}
+    ${st.mode === 'remote' ? '<p class="muted small">学習中は端末にためておき、セットの終わり・ホームに戻ったとき・アプリを閉じたときに、まとめてクラウドに保存します。インターネットにつながっていないときは、つながったら自動で送ります。</p>' : ''}
     ${st.mode === 'local' ? `<p class="alert small">いまの記録は、このiPhoneのブラウザの中だけにあります。Safariの「履歴とWebサイトデータを消去」をしたり、ホーム画面のアイコンを削除したりすると消えます。Safariで開いた場合は、しばらく使わないと消えることもあります。合言葉を入れて「接続して保存」を押すと、ここまでの記録もクラウドに移して保存します。</p>` : ''}
     ${st.mode === 'remote' ? '<button class="btn" data-action="sync-now">今すぐ保存</button>' : ''}
   </section>
