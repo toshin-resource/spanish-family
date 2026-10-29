@@ -200,6 +200,19 @@ export function applyResult(prev, result, { sessionId, firstInSession, today = t
   return s;
 }
 
+// 正解したが本人が「まだ覚えていない」と答えたとき：習得には数えず、翌日に復習へ戻す
+export function applyNotYet(prev, { today = todayKey(), now = Date.now() } = {}) {
+  return {
+    ...(prev || newState()),
+    status: 'learning',
+    streak: 0,
+    step: 0,
+    lastStepDay: today,
+    next: addDays(today, 1),
+    updatedAt: now,
+  };
+}
+
 export function isDue(state, today = todayKey()) {
   return !!(state && state.next && state.next <= today);
 }

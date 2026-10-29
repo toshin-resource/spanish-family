@@ -105,18 +105,18 @@ export function storageAvailable() {
 }
 
 // ---------- クラウド接続 ----------
+// 合言葉は使わない設定が標準。サーバーが合言葉を求めたとき（keyRequired）だけ入力してもらう
 export function remoteEnabled() {
-  return !!(db.remote.url && db.remote.key);
+  return !!db.remote.url && (!db.remote.keyRequired || !!db.remote.key);
 }
-// サーバーのURLはあるが、合言葉がまだ入っていない（最初に入力してもらう）
 export function needsKey() {
-  return !!db.remote.url && !db.remote.key;
+  return !!db.remote.url && !!db.remote.keyRequired && !db.remote.key;
 }
 export function remoteConfig() {
   return { ...db.remote };
 }
 export function setRemote(url, key) {
-  db.remote = { url: (url || '').trim(), key: (key || '').trim() };
+  db.remote = { url: (url || '').trim(), key: (key || '').trim(), keyRequired: !!(key || '').trim() };
   persist();
   emit();
 }
@@ -142,7 +142,16 @@ async function call(action, payload = {}) {
   } catch (e) {
     throw new Error('サーバーの応答を読み取れませんでした（Apps ScriptのURLや公開設定を確認してください）');
   }
-  if (!json.ok) throw new Error(json.error || 'サーバーでエラーが発生しました');
+  if (!json.ok) {
+    // サーバー側で合言葉が設定されている場合は、入力画面を出す
+    if (json.error === '合言葉が違います') {
+      db.remote.keyRequired = true;
+      db.remote.key = '';
+      persist();
+      setTimeout(emit);
+    }
+    throw new Error(json.error || 'サーバーでエラーが発生しました');
+  }
   return json;
 }
 
@@ -299,6 +308,15 @@ export function recordAnswer(id, answer, key, state) {
   (db.outbox.states[id] ||= {})[key] = true;
   persist();
   // 保存先はクラウド。回答のたびにすぐ送る（オフラインのときは端末に一時保存して、つながったら送る）
+  scheduleSync(200);
+}
+
+// 回答のあとで学習状態だけを直す（「まだ覚えていない」を選んだときなど）
+export function updateState(id, key, state) {
+  const u = db.users[id];
+  u.states[key] = state;
+  (db.outbox.states[id] ||= {})[key] = true;
+  persist();
   scheduleSync(200);
 }
 

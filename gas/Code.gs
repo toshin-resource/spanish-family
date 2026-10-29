@@ -30,15 +30,25 @@ function setup() {
     sh.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]).setFontWeight('bold');
     sh.setFrozenRows(1);
   });
-  // 家族の合言葉がまだなければ、推測されにくいものを自動で作る（変えたいときはスクリプト プロパティの FAMILY_KEY を書き換える）
+  Logger.log('準備ができました。合言葉なしで使えます（合言葉を付けたいときは関数「enableFamilyKey」を実行）。');
+}
+
+// 合言葉を付けたくなったときに実行する。アプリでは最初に合言葉の入力画面が出るようになる
+function enableFamilyKey() {
   var props = PropertiesService.getScriptProperties();
   if (!props.getProperty('FAMILY_KEY')) props.setProperty('FAMILY_KEY', makeFamilyKey());
-  Logger.log('準備ができました。家族の合言葉は、関数「showFamilyKey」を実行すると表示されます。');
+  showFamilyKey();
+}
+
+// 合言葉をやめて、合言葉なしで使えるようにする
+function disableFamilyKey() {
+  PropertiesService.getScriptProperties().deleteProperty('FAMILY_KEY');
+  Logger.log('合言葉をなくしました。合言葉なしで使えます。');
 }
 
 // 家族の合言葉を表示する（アプリの「設定」→「クラウド保存」に入力する）
 function showFamilyKey() {
-  Logger.log('家族の合言葉：' + PropertiesService.getScriptProperties().getProperty('FAMILY_KEY'));
+  Logger.log('家族の合言葉：' + (PropertiesService.getScriptProperties().getProperty('FAMILY_KEY') || '（設定なし）'));
 }
 
 // iPhoneでも入力しやすいよう、紛らわしい文字（0/o、1/l など）を除いた小文字と数字で作る
@@ -64,9 +74,9 @@ function doPost(e) {
   } catch (err) {
     return out({ ok: false, error: 'リクエストを読み取れませんでした' });
   }
+  // 合言葉（FAMILY_KEY）を設定したときだけ確認する。設定がなければ合言葉なしで使える
   var familyKey = PropertiesService.getScriptProperties().getProperty('FAMILY_KEY');
-  if (!familyKey) return out({ ok: false, error: 'サーバー側で合言葉（FAMILY_KEY）が設定されていません' });
-  if (String(req.key || '') !== familyKey) {
+  if (familyKey && String(req.key || '') !== familyKey) {
     Utilities.sleep(800); // 総当たりを遅くする
     return out({ ok: false, error: '合言葉が違います' });
   }

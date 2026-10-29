@@ -4,7 +4,7 @@ import * as sp from './speech.js';
 import { toIpa } from './ipa.js';
 import {
   RULES, WORDS, PHRASES, WORD_STAGES, PHRASE_CATEGORIES, getItem, stateKey, todayKey, addDays,
-  applyResult, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor,
+  applyResult, applyNotYet, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor,
 } from './learn.js';
 
 const $main = document.getElementById('main');
@@ -100,6 +100,8 @@ function renderSave(s = store.status()) {
   $save.innerHTML = html;
 }
 store.onStatus(renderSave);
+// サーバーが合言葉を求めてきたときだけ、入力画面に切り替える
+store.onStatus(() => { if (store.needsKey() && ui.screen !== 'passcode') render(); });
 
 // ---------- 利用者選択 ----------
 function screenUsers() {
@@ -140,7 +142,7 @@ function screenPasscode() {
   return `
   <section class="card">
     <h1 class="title">家族の合言葉を入力</h1>
-    <p>学習の記録は、家族共通のクラウド（Googleスプレッドシート）に保存します。最初に一度だけ、家族の合言葉を入力してください。</p>
+    <p>学習の記録は、家族共通のクラウド（Googleスプレッドシート）に保存します。保存先のサーバーに合言葉が設定されているため、最初に一度だけ入力してください。</p>
     <form data-form="passcode">
       <label class="field-label" for="passcode-input">合言葉</label>
       <input id="passcode-input" name="key" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
@@ -450,7 +452,8 @@ function actionBar(q) {
   const inner = q.pending
     ? `<button class="btn ok" data-action="self-judge" data-value="correct">正解として記録</button>
        <button class="btn" data-action="self-judge" data-value="wrong">復習に回す</button>`
-    : '<button class="btn primary big" data-action="next">次へ</button>';
+    : `<button class="btn big" data-action="rate" data-value="notyet">まだ覚えていない</button>
+       <button class="btn primary big" data-action="rate" data-value="known">覚えた</button>`;
   return `<div class="action-bar"><div class="action-inner">${inner}</div></div>`;
 }
 
@@ -912,8 +915,34 @@ const actions = {
     if (!q || !q.pending) return;
     // 発音は「確認待ち」を表示したときに読み上げ済みなので、ここでは効果音だけ
     commitAnswer(el.dataset.value === 'correct' ? 'correct' : 'wrong', { judgedBy: 'self', speak: false });
+    // 自分で判定したので、「覚えた／まだ覚えていない」は聞かずに次の問題へ
+    ui.q.rated = true;
+    nextQuestion();
   },
   next: () => nextQuestion(),
+  // 回答後の自己評価。どちらを押しても次の問題へ進む
+  rate: (el) => {
+    const q = ui.q;
+    if (!q || !q.done || q.rated) return;
+    q.rated = true;
+    if (el.dataset.value === 'notyet' && q.result === 'correct') {
+      // 当てずっぽうで正解したときなど：習得には数えず、翌日の復習と、この学習の中での再出題に回す
+      const u = me();
+      const sn = u.session;
+      const { entry } = q;
+      const key = stateKey(entry.kind, entry.id, entry.dir, entry.mode);
+      store.updateState(u.profile.user_id, key, applyNotYet(u.states[key]));
+      const n = sn.retries[key] || 0;
+      if (n < RULES.maxRetriesPerItem) {
+        sn.retries[key] = n + 1;
+        sn.queue.splice(Math.min(sn.pos + RULES.requeueGap, sn.queue.length), 0, { ...entry, retry: true });
+      }
+      const last = sn.log[sn.log.length - 1];
+      if (last && last.id === entry.id) last.notYet = true;
+      store.saveSession(u.profile.user_id, sn);
+    }
+    nextQuestion();
+  },
   'skip-q': () => {
     // 再生できなかった問題は記録せず、セットの最後に回す
     const sn = me().session;
@@ -1050,7 +1079,6 @@ document.addEventListener('submit', async (e) => {
     const url = form.url.value.trim();
     const key = form.key.value.trim();
     if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) { toast('Apps Script のURL（https://script.google.com/…/exec）を入力してください。', 5000); return; }
-    if (!key) { toast('合言葉を入力してください。'); return; }
     toast('接続を確認しています…');
     try {
       await store.testRemote(url, key);
