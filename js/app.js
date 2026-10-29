@@ -204,7 +204,10 @@ function screenHome() {
   </section>
 
   <section class="card">
-    <div class="kind-switch">${seg('kind', s.kind, [['word', '単語学習'], ['phrase', '日常フレーズ集']])}</div>
+    <div class="kind-switch">
+      ${seg('kind', s.kind, [['word', '単語学習'], ['phrase', '日常フレーズ集']])}
+      ${seg('dir', s.dir, [['es-ja', 'スペイン語→日本語'], ['ja-es', '日本語→スペイン語']])}
+    </div>
     <button class="btn today" data-action="today">
       <span class="today-title">今日の${s.setSize}問</span>
       <span class="today-sub">${KIND_LABEL[s.kind]}・${DIR_LABEL[m.dir]}・${m.presentation === 'listen' ? '聞き取り' : m.answerMode === 'input' ? '入力式' : '選択式'}</span>

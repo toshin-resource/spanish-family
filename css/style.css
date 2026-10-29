@@ -125,7 +125,8 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 .progress-label { font-size: 0.92rem; margin-top: 6px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .chip { background: #fff; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; font-size: 0.82rem; }
-.kind-switch { margin-bottom: 10px; }
+.kind-switch { margin-bottom: 10px; display: grid; gap: 8px; }
+.kind-switch .seg + .seg { margin-top: 0; }
 .btn.today {
   width: 100%; flex-direction: column; gap: 2px; min-height: 96px; border: 0; border-radius: 18px; color: var(--ink);
   background: linear-gradient(135deg, #ffd65a, var(--sun)); box-shadow: 0 2px 0 var(--sun-deep);
