@@ -13,19 +13,19 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=20261030a">
+  <link rel="stylesheet" href="css/style.css?v=20261030b">
   <!-- 更新したら v= の値を変える。古いファイルと新しいファイルが混ざって動かなくなるのを防ぐ -->
   <script type="importmap">
   {
     "imports": {
-      "./js/app.js": "./js/app.js?v=20261030a",
-      "./js/store.js": "./js/store.js?v=20261030a",
-      "./js/learn.js": "./js/learn.js?v=20261030a",
-      "./js/speech.js": "./js/speech.js?v=20261030a",
-      "./js/ipa.js": "./js/ipa.js?v=20261030a",
-      "./js/data-words.js": "./js/data-words.js?v=20261030a",
-      "./js/data-phrases.js": "./js/data-phrases.js?v=20261030a",
-      "./config.js": "./config.js?v=20261030a"
+      "./js/app.js": "./js/app.js?v=20261030b",
+      "./js/store.js": "./js/store.js?v=20261030b",
+      "./js/learn.js": "./js/learn.js?v=20261030b",
+      "./js/speech.js": "./js/speech.js?v=20261030b",
+      "./js/ipa.js": "./js/ipa.js?v=20261030b",
+      "./js/data-words.js": "./js/data-words.js?v=20261030b",
+      "./js/data-phrases.js": "./js/data-phrases.js?v=20261030b",
+      "./config.js": "./config.js?v=20261030b"
     }
   }
   </script>
@@ -34,7 +34,7 @@
   <header class="app-header">
     <div class="stripe"></div>
     <div class="bar">
-      <div class="brand"><span class="sun" aria-hidden="true"></span><span>はじめのスペイン語</span></div>
+      <div class="brand" id="brand"><span class="sun" aria-hidden="true"></span><span>はじめのスペイン語</span></div>
       <div id="save-status" class="save-status" aria-live="polite"></div>
     </div>
   </header>
@@ -42,6 +42,6 @@
   <div id="modal" class="modal" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <noscript><p class="wrap">このアプリを使うには JavaScript を有効にしてください。</p></noscript>
-  <script type="module" src="js/app.js?v=20261030a"></script>
+  <script type="module" src="js/app.js?v=20261030b"></script>
 </body>
 </html>

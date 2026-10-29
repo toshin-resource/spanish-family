@@ -11,6 +11,8 @@ const $main = document.getElementById('main');
 const $modal = document.getElementById('modal');
 const $toast = document.getElementById('toast');
 const $save = document.getElementById('save-status');
+const $brand = document.getElementById('brand');
+const BRAND_HTML = $brand.innerHTML;
 
 const ui = {
   screen: 'users',
@@ -430,7 +432,6 @@ function screenQuiz() {
 
   return `
   <div class="quiz-top">
-    <button class="btn small back" data-action="quit">← メニューへ</button>
     <div class="qprogress"><div class="bar"><div style="width:${pct}%"></div></div><span>${progressDone} / ${sn.target}</span></div>
   </div>
   <section class="card quiz">
@@ -608,7 +609,7 @@ function screenList() {
   const li = (w) => itemStatus(u.states, w, 'es-ja', 'listen') === 'mastered';
   return `
   <section class="card">
-    <div class="row between"><h1 class="title">単語リスト</h1><button class="btn small ghost" data-action="go" data-to="home">ホームへ</button></div>
+    <h1 class="title">単語リスト</h1>
     ${seg('list-scope', scope, [...WORD_STAGES.map((s) => [String(s.id), s.label]), ['all', 'すべて']])}
     ${seg('list-filter', filter, [['all', 'すべて'], ['new', '未学習'], ['learning', '学習中'], ['mastered', '習得済み'], ['unmastered', '未習得']])}
     <p class="muted small">状態は「スペイン語→日本語（文字あり）」の結果です。「未習得」は未学習と学習中の両方を含みます。${rows.length}語</p>
@@ -631,7 +632,7 @@ function screenPhrases() {
   const list = PHRASES.filter((p) => p.category === cat);
   return `
   <section class="card">
-    <div class="row between"><h1 class="title">日常フレーズ集</h1><button class="btn small ghost" data-action="go" data-to="home">ホームへ</button></div>
+    <h1 class="title">日常フレーズ集</h1>
     <div class="tabs">${PHRASE_CATEGORIES.map((c) => `<button class="${c === cat ? 'on' : ''}" data-action="phrase-cat" data-value="${esc(c)}">${esc(c)}</button>`).join('')}</div>
     <ul class="phrase-list">
       ${list.map((p) => {
@@ -679,7 +680,7 @@ function screenFamily() {
   }
   return `
   <section class="card">
-    <div class="row between"><h1 class="title">家族の学習状況</h1><button class="btn small ghost" data-action="go" data-to="home">ホームへ</button></div>
+    <h1 class="title">家族の学習状況</h1>
     <div class="fam-list">${body}</div>
   </section>`;
 }
@@ -764,7 +765,7 @@ function screenSettings() {
   </section>` : '';
   const st = store.status();
   return `
-  <div class="row between pad"><h1 class="title">設定</h1><button class="btn small ghost" data-action="go" data-to="${u ? 'home' : 'users'}">戻る</button></div>
+  <h1 class="title pad">設定</h1>
   ${userPart}
   <section class="card" id="cloud">
     <h2>クラウド保存（家族で共有）</h2>
@@ -831,7 +832,15 @@ function render() {
   if (!me() && !['users', 'settings', 'passcode'].includes(ui.screen)) ui.screen = 'users';
   $main.innerHTML = SCREENS[ui.screen]();
   document.body.dataset.screen = ui.screen;
+  renderHeader();
   renderSave();
+}
+
+// 画面上部の固定バー：ホーム以外の画面では、アプリ名の代わりに「ホームへ戻る」ボタンを出す
+function renderHeader() {
+  if (['home', 'users', 'passcode'].includes(ui.screen)) { $brand.innerHTML = BRAND_HTML; return; }
+  const label = me() ? '← ホーム' : '← もどる';
+  $brand.innerHTML = `<button class="btn small back home-nav" data-action="home-nav">${label}</button>`;
 }
 
 // ---------- 操作 ----------
@@ -920,6 +929,10 @@ const actions = {
     nextQuestion();
   },
   next: () => nextQuestion(),
+  'home-nav': () => {
+    if (ui.screen === 'quiz') return actions.quit();
+    go(me() ? 'home' : 'users');
+  },
   // 回答後の自己評価。どちらを押しても次の問題へ進む
   rate: (el) => {
     const q = ui.q;

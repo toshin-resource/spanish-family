@@ -152,6 +152,7 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 .prompt .ipa { font-size: 1.1rem; }
 .pos { display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 1px 8px; border-radius: 6px; border: 1px solid var(--sun); color: var(--pending); background: #fff8e1; white-space: nowrap; }
 .btn.back { border-color: var(--celeste); color: var(--celeste-deep); background: #fff; }
+.btn.home-nav { margin: 0; min-height: 42px; padding: 6px 16px; font-size: 1rem; }
 .icon-btn.play-icon { width: 52px; height: 52px; font-size: 1.35rem; border-color: var(--celeste); }
 .prompt p { margin: 0; }
 .article { font-size: 0.55em; font-weight: 600; color: var(--muted); vertical-align: middle; }
