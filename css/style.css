@@ -146,8 +146,11 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 .prompt-row { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; }
 .prompt-es { font-size: 2.2rem; font-weight: 800; line-height: 1.2; word-break: break-word; min-width: 0; }
 .prompt-ja { font-size: 1.8rem; font-weight: 800; line-height: 1.3; }
+.sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.prompt .sub { justify-content: center; margin-top: -4px; }
 .ipa { font-family: "Doulos SIL", "Charis SIL", "Lucida Sans Unicode", "Arial Unicode MS", -apple-system, sans-serif; color: var(--celeste-deep); font-size: 0.95rem; letter-spacing: 0.02em; }
-.prompt .ipa { font-size: 1.1rem; margin-top: -4px; }
+.prompt .ipa { font-size: 1.1rem; }
+.pos { display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 1px 8px; border-radius: 6px; border: 1px solid var(--sun); color: var(--pending); background: #fff8e1; white-space: nowrap; }
 .btn.back { border-color: var(--celeste); color: var(--celeste-deep); background: #fff; }
 .icon-btn.play-icon { width: 52px; height: 52px; font-size: 1.35rem; border-color: var(--celeste); }
 .prompt p { margin: 0; }

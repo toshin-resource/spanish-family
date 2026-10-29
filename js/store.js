@@ -50,7 +50,10 @@ function load() {
     if (raw) {
       const d = JSON.parse(raw);
       const base = fresh();
-      return { ...base, ...d, outbox: { ...base.outbox, ...(d.outbox || {}) }, remote: { ...base.remote, ...(d.remote || {}) } };
+      const remote = { ...base.remote, ...(d.remote || {}) };
+      // サーバーのURLは config.js の値を使う（以前の版で空のまま保存された端末にも反映する）
+      if (!remote.url && APP_CONFIG.GAS_URL) remote.url = APP_CONFIG.GAS_URL;
+      return { ...base, ...d, outbox: { ...base.outbox, ...(d.outbox || {}) }, remote };
     }
   } catch (e) {
     storageOk = false;
@@ -84,10 +87,17 @@ export function pendingCount() {
   const ob = db.outbox;
   return ob.answers.length + Object.values(ob.states).reduce((n, m) => n + Object.keys(m).length, 0) + Object.keys(ob.users).length;
 }
+export function online() {
+  return navigator.onLine !== false;
+}
 export function status() {
   if (!remoteEnabled()) return { mode: 'local', phase: 'local', pending: 0, storageOk, message: '' };
   const pending = pendingCount();
-  const phase = syncState.phase === 'saving' ? 'saving' : syncState.phase === 'error' ? 'error' : pending ? 'pending' : 'saved';
+  let phase;
+  if (!online()) phase = 'offline'; // 端末に一時保存し、つながったら自動で送る
+  else if (syncState.phase === 'saving') phase = 'saving';
+  else if (syncState.phase === 'error') phase = 'error';
+  else phase = pending ? 'pending' : 'saved';
   return { mode: 'remote', phase, pending, storageOk, message: syncState.message };
 }
 export function storageAvailable() {
@@ -97,6 +107,10 @@ export function storageAvailable() {
 // ---------- クラウド接続 ----------
 export function remoteEnabled() {
   return !!(db.remote.url && db.remote.key);
+}
+// サーバーのURLはあるが、合言葉がまだ入っていない（最初に入力してもらう）
+export function needsKey() {
+  return !!db.remote.url && !db.remote.key;
 }
 export function remoteConfig() {
   return { ...db.remote };
@@ -108,13 +122,19 @@ export function setRemote(url, key) {
 }
 
 async function call(action, payload = {}) {
-  const res = await fetch(db.remote.url, {
-    method: 'POST',
-    // text/plain にすると事前確認（プリフライト）なしで Apps Script に送れる
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, key: db.remote.key, ...payload }),
-    redirect: 'follow',
-  });
+  if (!online()) throw new Error('インターネットにつながっていません');
+  let res;
+  try {
+    res = await fetch(db.remote.url, {
+      method: 'POST',
+      // text/plain にすると事前確認（プリフライト）なしで Apps Script に送れる
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, key: db.remote.key, ...payload }),
+      redirect: 'follow',
+    });
+  } catch (e) {
+    throw new Error(online() ? 'サーバーと通信できませんでした' : 'インターネットにつながっていません');
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   let json;
   try {
@@ -276,11 +296,10 @@ export function recordAnswer(id, answer, key, state) {
   const u = db.users[id];
   u.states[key] = state;
   db.outbox.answers.push(answer);
-  // クラウド未接続のあいだは回答履歴を直近の分だけ持っておく（接続したときにまとめて送る）
-  if (!remoteEnabled() && db.outbox.answers.length > 3000) db.outbox.answers.splice(0, db.outbox.answers.length - 3000);
   (db.outbox.states[id] ||= {})[key] = true;
   persist();
-  scheduleSync();
+  // 保存先はクラウド。回答のたびにすぐ送る（オフラインのときは端末に一時保存して、つながったら送る）
+  scheduleSync(200);
 }
 
 // ---------- 送信 ----------
@@ -288,7 +307,7 @@ let timer = null;
 let running = null;
 let retryDelay = 3000;
 
-export function scheduleSync(delay = 1500) {
+export function scheduleSync(delay = 300) {
   if (!remoteEnabled()) return;
   emit();
   clearTimeout(timer);
@@ -299,6 +318,8 @@ export async function syncNow() {
   if (!remoteEnabled()) return;
   if (running) return running;
   if (!pendingCount()) { syncState = { phase: 'idle', message: '' }; emit(); return; }
+  // オフライン中は送らずに待つ（「online」になったら自動で送る）
+  if (!online()) { syncState = { phase: 'idle', message: '' }; emit(); return; }
   running = (async () => {
     syncState = { phase: 'saving', message: '' };
     emit();
@@ -338,16 +359,18 @@ export async function syncNow() {
       syncState = { phase: 'idle', message: '' };
       retryDelay = 3000;
     } catch (e) {
-      syncState = { phase: 'error', message: e.message || String(e) };
-      // 少しずつ間隔を空けて自動で再試行する
+      syncState = { phase: online() ? 'error' : 'idle', message: e.message || String(e) };
+      // 少しずつ間隔を空けて自動で再試行する（オフラインなら「online」になったときに送る）
       clearTimeout(timer);
-      timer = setTimeout(() => { syncNow().catch(() => {}); }, retryDelay);
+      if (online()) timer = setTimeout(() => { syncNow().catch(() => {}); }, retryDelay);
       retryDelay = Math.min(retryDelay * 2, 60000);
       throw e;
     } finally {
       running = null;
       emit();
     }
+    // 送っている間に増えた回答があれば続けて送る
+    if (pendingCount()) scheduleSync(200);
   })();
   return running;
 }
@@ -373,7 +396,10 @@ export function exportData() {
   return JSON.stringify({ exportedAt: new Date().toISOString(), users: db.users }, null, 1);
 }
 
-window.addEventListener('online', () => scheduleSync(500));
+// インターネットにつながったら、端末に一時保存していた分をすぐ送る
+window.addEventListener('online', () => { retryDelay = 3000; scheduleSync(300); });
+window.addEventListener('offline', () => emit());
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') syncNow().catch(() => {});
+  else scheduleSync(300); // アプリを開き直したとき、送り残しがあれば送る
 });

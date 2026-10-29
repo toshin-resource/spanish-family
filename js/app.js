@@ -35,11 +35,12 @@ function esWithArticle(item) {
   return item.article ? `<span class="article">${esc(item.article)}</span> ${esc(item.es)}` : esc(item.es);
 }
 
-// 発音記号（設定で「表示しない」にもできる）
+// 単語の下の補足行：発音記号（設定で「表示しない」にもできる）と品詞（名詞・動詞など）
 function ipaLine(item) {
   const v = settings().ipa;
-  if (v === 'off') return '';
-  return `<div class="ipa" lang="es-fonipa">${esc(toIpa(item.es, v))}</div>`;
+  const ipa = v === 'off' ? '' : `<span class="ipa" lang="es-fonipa">${esc(toIpa(item.es, v))}</span>`;
+  const pos = item.pos ? `<span class="pos">${esc(item.pos)}</span>` : '';
+  return ipa || pos ? `<div class="sub">${ipa}${pos}</div>` : '';
 }
 
 function toast(msg, ms = 3200) {
@@ -91,6 +92,7 @@ function renderSave(s = store.status()) {
   let html;
   if (!s.storageOk) html = '<span class="dot err"></span>この端末に保存できません';
   else if (s.mode === 'local') html = '<span class="dot local"></span>この端末だけに保存中';
+  else if (s.phase === 'offline') html = `<span class="dot err"></span>オフライン${s.pending ? `：${s.pending}件を一時保存中` : ''}`;
   else if (s.phase === 'saving') html = '<span class="dot busy"></span>保存中…';
   else if (s.phase === 'error') html = `<button class="linkish" data-action="sync-now"><span class="dot err"></span>未保存 ${s.pending}件・再試行</button>`;
   else if (s.phase === 'pending') html = `<span class="dot busy"></span>送信待ち ${s.pending}件`;
@@ -126,9 +128,30 @@ function screenUsers() {
   </section>
   <section class="card soft">
     ${remote
-      ? '<p class="small"><span class="dot ok"></span>家族のクラウド保存に接続しています。</p>'
-      : `<p class="small"><span class="dot local"></span>いまは<b>この端末だけ</b>に保存されます。家族で記録を共有したり、別の端末で続きをするには、クラウド保存に接続してください。</p>`}
-    <button class="btn" data-action="open-cloud">クラウド保存の設定</button>
+      ? '<p class="small"><span class="dot ok"></span>記録は家族のクラウド（Googleスプレッドシート）に保存されます。</p>'
+      : `<p class="small"><span class="dot local"></span>いまは<b>この端末だけ</b>に保存されます。家族で記録を共有したり、別の端末で続きをするには、クラウド保存に接続してください。</p>
+         <button class="btn" data-action="open-cloud">クラウド保存の設定</button>`}
+    <button class="btn" data-action="a2hs">ホーム画面に追加する方法</button>
+  </section>`;
+}
+
+// ---------- 家族の合言葉（最初に一度だけ入力） ----------
+function screenPasscode() {
+  return `
+  <section class="card">
+    <h1 class="title">家族の合言葉を入力</h1>
+    <p>学習の記録は、家族共通のクラウド（Googleスプレッドシート）に保存します。最初に一度だけ、家族の合言葉を入力してください。</p>
+    <form data-form="passcode">
+      <label class="field-label" for="passcode-input">合言葉</label>
+      <input id="passcode-input" name="key" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
+        placeholder="例：abcd-efgh-jkmn-pqrs" required>
+      <button class="btn primary wide big" ${ui.busy ? 'disabled' : ''}>${ui.busy ? '確認しています…' : 'はじめる'}</button>
+    </form>
+    ${ui.passError ? `<p class="alert small">${esc(ui.passError)}</p>` : ''}
+    <p class="muted small">合言葉がわからないときは、アプリを準備した家族に聞いてください（Apps Script の「showFamilyKey」で確認できます）。
+    この端末で学習した記録が残っている場合は、接続したときにクラウドへ移します。</p>
+  </section>
+  <section class="card soft">
     <button class="btn" data-action="a2hs">ホーム画面に追加する方法</button>
   </section>`;
 }
@@ -374,6 +397,7 @@ function screenQuiz() {
   } else {
     prompt = `
       <div class="prompt-ja${item.ja.length > 9 ? ' long' : ''}">${esc(item.ja)}</div>
+      ${item.pos ? `<div class="sub"><span class="pos">${esc(item.pos)}</span></div>` : ''}
       ${revealed ? '' : '<p class="muted small center">発音は回答後に聞けます。</p>'}`;
   }
 
@@ -749,10 +773,13 @@ function screenSettings() {
       <input name="key" type="password" autocomplete="off" value="${esc(r.key)}" placeholder="合言葉">
       <div class="row wrap">
         <button class="btn primary">接続して保存</button>
-        ${r.url ? '<button type="button" class="btn" data-action="cloud-off">この端末だけに保存する</button>' : ''}
       </div>
     </form>
-    <p class="small">状態：${st.mode === 'local' ? 'この端末だけに保存中' : st.phase === 'error' ? `未保存 ${st.pending}件（${esc(st.message)}）` : st.pending ? `送信待ち ${st.pending}件` : 'クラウドに保存済み'}</p>
+    <p class="small">状態：${st.mode === 'local' ? 'この端末だけに保存中'
+      : st.phase === 'offline' ? `オフライン。${st.pending ? `${st.pending}件をこの端末に一時保存し、インターネットにつながったら自動で送ります` : '送り残しはありません'}`
+      : st.phase === 'error' ? `未保存 ${st.pending}件（${esc(st.message)}）。自動で再試行します`
+      : st.pending ? `送信待ち ${st.pending}件` : 'クラウドに保存済み'}</p>
+    ${st.mode === 'remote' ? '<p class="muted small">記録はクラウドに保存します。インターネットにつながっていないときだけ、この端末に一時保存し、つながったら自動で送ります。</p>' : ''}
     ${st.mode === 'local' ? `<p class="alert small">いまの記録は、このiPhoneのブラウザの中だけにあります。Safariの「履歴とWebサイトデータを消去」をしたり、ホーム画面のアイコンを削除したりすると消えます。Safariで開いた場合は、しばらく使わないと消えることもあります。合言葉を入れて「接続して保存」を押すと、ここまでの記録もクラウドに移して保存します。</p>` : ''}
     ${st.mode === 'remote' ? '<button class="btn" data-action="sync-now">今すぐ保存</button>' : ''}
   </section>
@@ -791,10 +818,14 @@ function showA2HS() {
 const SCREENS = {
   users: screenUsers, home: screenHome, setup: screenSetup, quiz: screenQuiz, result: screenResult,
   list: screenList, phrases: screenPhrases, family: screenFamily, settings: screenSettings,
+  passcode: screenPasscode,
 };
 
 function render() {
-  if (!me() && !['users', 'settings'].includes(ui.screen)) ui.screen = 'users';
+  // 保存先はクラウド。合言葉が入るまでは学習を始めない
+  if (store.needsKey()) ui.screen = 'passcode';
+  else if (ui.screen === 'passcode') ui.screen = me() ? 'home' : 'users';
+  if (!me() && !['users', 'settings', 'passcode'].includes(ui.screen)) ui.screen = 'users';
   $main.innerHTML = SCREENS[ui.screen]();
   document.body.dataset.screen = ui.screen;
   renderSave();
@@ -930,11 +961,6 @@ const actions = {
   'phrase-cat': (el) => { ui.phraseCat = el.dataset.value; render(); },
   'load-family': () => loadFamily(),
   'sync-now': () => store.syncNow().then(() => toast('保存しました')).catch((e) => toast(`保存できませんでした：${e.message}`, 5000)),
-  'cloud-off': () => {
-    if (!confirm('クラウド保存の接続をやめ、この端末だけに保存しますか？（クラウドの記録は消えません）')) return;
-    store.setRemote('', '');
-    render();
-  },
   export: () => {
     const blob = new Blob([store.exportData()], { type: 'application/json' });
     const a = document.createElement('a');
@@ -999,6 +1025,27 @@ document.addEventListener('submit', async (e) => {
     }
     ui.busy = false;
     if (ui.screen === 'users') render();
+  } else if (kind === 'passcode') {
+    const key = form.key.value.trim();
+    if (!key || ui.busy) return;
+    ui.busy = true;
+    ui.passError = '';
+    render();
+    try {
+      const { url } = store.remoteConfig();
+      await store.testRemote(url, key);
+      store.setRemote(url, key);
+      // この端末で学習済みの記録があれば、ここでクラウドに移す
+      await store.refreshUsers();
+      if (store.currentUid()) await store.pullUser(store.currentUid()).catch(() => {});
+      store.scheduleSync(200);
+      ui.screen = store.currentUid() ? 'home' : 'users';
+      toast('クラウドに接続しました。記録はクラウドに保存されます。');
+    } catch (err) {
+      ui.passError = `接続できませんでした：${err.message}`;
+    }
+    ui.busy = false;
+    render();
   } else if (kind === 'cloud') {
     const url = form.url.value.trim();
     const key = form.key.value.trim();
@@ -1022,7 +1069,13 @@ document.addEventListener('submit', async (e) => {
 window.speechSynthesis?.addEventListener?.('voiceschanged', () => { if (ui.screen === 'settings') render(); });
 
 // 他の画面に移るときやアプリを閉じるときは音声入力を止める
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') sp.stopListening(); });
+// アプリに戻ってきたときは、ほかの端末での学習分をクラウドから読み込み直す
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { sp.stopListening(); return; }
+  if (store.remoteEnabled() && store.currentUid() && store.online()) {
+    store.pullUser(store.currentUid()).then(() => { if (['home', 'list', 'phrases'].includes(ui.screen)) render(); }).catch(() => {});
+  }
+});
 
 async function loadUsers() {
   ui.usersError = '';
@@ -1038,6 +1091,11 @@ async function loadUsers() {
 
 // ---------- 起動 ----------
 async function boot() {
+  if (store.needsKey()) {
+    ui.screen = 'passcode';
+    render();
+    return;
+  }
   if (store.currentUid()) {
     ui.screen = 'home';
     render();
