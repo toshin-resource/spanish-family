@@ -18,6 +18,9 @@ export const DEFAULT_SETTINGS = {
   choices: 4,
   rate: 0.9,
   voiceURI: '',
+  ipa: 'latam', // 発音記号：latam 中南米 / ar アルゼンチン / off 表示しない
+  autoSpeak: 'on', // 回答したら発音を読み上げる
+  sfx: 'on', // 正解のときに効果音を鳴らす
 };
 
 function fresh() {

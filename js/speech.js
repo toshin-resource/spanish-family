@@ -87,6 +87,54 @@ export function speaking() {
   return !!(synth && synth.speaking);
 }
 
+// ---------- 効果音 ----------
+// 音声ファイルを使わず、ブラウザで「ピンポン」と2音を鳴らす（iPhoneの消音モード中は鳴らない）
+let actx = null;
+export function unlockAudio() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    actx ||= new Ctx();
+    if (actx.state === 'suspended') actx.resume();
+  } catch (e) { /* 効果音なしで続ける */ }
+}
+
+// 鳴らした長さ（ミリ秒）を返す。鳴らせないときは 0
+export function playChime() {
+  unlockAudio();
+  if (!actx) return 0;
+  try {
+    const t0 = actx.currentTime + 0.02;
+    [[880, 0], [1318.5, 0.12]].forEach(([freq, dt]) => {
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t0 + dt);
+      gain.gain.exponentialRampToValueAtTime(0.3, t0 + dt + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.4);
+      osc.connect(gain).connect(actx.destination);
+      osc.start(t0 + dt);
+      osc.stop(t0 + dt + 0.45);
+    });
+    return 500;
+  } catch (e) {
+    return 0;
+  }
+}
+
+// iPhoneでは最初の読み上げを画面操作の中で行う必要があるため、最初のタップで無音の読み上げをしておく
+let speechUnlocked = false;
+export function unlockSpeech() {
+  if (speechUnlocked || !ttsSupported()) return;
+  speechUnlocked = true;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    synth.speak(u);
+  } catch (e) { /* 読み上げなしで続ける */ }
+}
+
 // ---------- 音声入力 ----------
 const Recognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 let rec = null;

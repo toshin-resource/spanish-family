@@ -1,6 +1,7 @@
 // 画面と操作
 import * as store from './store.js';
 import * as sp from './speech.js';
+import { toIpa } from './ipa.js';
 import {
   RULES, WORDS, PHRASES, WORD_STAGES, PHRASE_CATEGORIES, getItem, stateKey, todayKey, addDays,
   applyResult, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor,
@@ -32,6 +33,13 @@ const KIND_LABEL = { word: '単語', phrase: 'フレーズ' };
 
 function esWithArticle(item) {
   return item.article ? `<span class="article">${esc(item.article)}</span> ${esc(item.es)}` : esc(item.es);
+}
+
+// 発音記号（設定で「表示しない」にもできる）
+function ipaLine(item) {
+  const v = settings().ipa;
+  if (v === 'off') return '';
+  return `<div class="ipa" lang="es-fonipa">${esc(toIpa(item.es, v))}</div>`;
 }
 
 function toast(msg, ms = 3200) {
@@ -338,11 +346,21 @@ function screenQuiz() {
   const progressDone = sn.answeredCount;
   const pct = Math.round((progressDone / sn.target) * 100);
 
+  // 単語と発音ボタンを横に並べて、回答後も「次へ」までスクロールせずに見えるようにする
+  const longEs = item.es.length > 14 ? ' long' : '';
+  const esRow = `
+      <div class="prompt-row">
+        <div class="prompt-es${longEs}">${esWithArticle(item)}</div>
+        <button class="icon-btn play-icon" data-action="play-q" aria-label="発音を聞く">🔊</button>
+      </div>
+      ${ipaLine(item)}`;
   let prompt;
-  if (listen) {
+  if (listen && revealed) {
+    prompt = esRow;
+  } else if (listen) {
     prompt = `
       <button class="play-big" data-action="play-q" aria-label="音声を再生">▶<span>音声を再生</span></button>
-      ${revealed ? `<div class="prompt-es">${esWithArticle(item)}</div>` : '<p class="muted small center">文字は回答後に表示されます。何度でも聞き直せます。</p>'}
+      <p class="muted small center">文字は回答後に表示されます。何度でも聞き直せます。</p>
       ${q.audioError ? `
         <div class="alert">音声を再生できませんでした。この問題は不正解にはなりません。
           <div class="row wrap">
@@ -352,13 +370,11 @@ function screenQuiz() {
           </div>
         </div>` : ''}`;
   } else if (entry.dir === 'es-ja') {
-    prompt = `
-      <div class="prompt-es">${esWithArticle(item)}</div>
-      <button class="btn play" data-action="play-q">🔊 発音を聞く</button>`;
+    prompt = esRow;
   } else {
     prompt = `
-      <div class="prompt-ja">${esc(item.ja)}</div>
-      ${revealed ? '<button class="btn play" data-action="play-q">🔊 発音を聞く</button>' : '<p class="muted small center">発音は回答後に聞けます。</p>'}`;
+      <div class="prompt-ja${item.ja.length > 9 ? ' long' : ''}">${esc(item.ja)}</div>
+      ${revealed ? '' : '<p class="muted small center">発音は回答後に聞けます。</p>'}`;
   }
 
   let answerArea = '';
@@ -388,7 +404,7 @@ function screenQuiz() {
 
   return `
   <div class="quiz-top">
-    <button class="btn small ghost" data-action="quit">✕ 中断</button>
+    <button class="btn small back" data-action="quit">← メニューへ</button>
     <div class="qprogress"><div class="bar"><div style="width:${pct}%"></div></div><span>${progressDone} / ${sn.target}</span></div>
   </div>
   <section class="card quiz">
@@ -401,54 +417,69 @@ function screenQuiz() {
     ${answerArea}
     ${!revealed ? '<button class="btn ghost wide" data-action="dont-know">わからない</button>' : ''}
     ${revealed ? feedback(q) : ''}
-  </section>`;
+  </section>
+  ${revealed ? actionBar(q) : ''}`;
+}
+
+// 回答後の操作は画面下に固定し、スクロールしなくても押せるようにする
+function actionBar(q) {
+  const inner = q.pending
+    ? `<button class="btn ok" data-action="self-judge" data-value="correct">正解として記録</button>
+       <button class="btn" data-action="self-judge" data-value="wrong">復習に回す</button>`
+    : '<button class="btn primary big" data-action="next">次へ</button>';
+  return `<div class="action-bar"><div class="action-inner">${inner}</div></div>`;
 }
 
 function feedback(q) {
   const { item, entry } = q;
   const others = item.accepted.slice(1).filter((a) => a !== item.ja);
-  const head = q.pending
-    ? '<div class="verdict pending">確認待ち</div>'
+  const verdict = q.pending
+    ? ['pending', '確認待ち']
     : q.result === 'correct'
-      ? '<div class="verdict ok">正解！</div>'
+      ? ['ok', '正解！']
       : q.result === 'unknown'
-        ? '<div class="verdict unknown">正しい意味を確認しましょう</div>'
-        : '<div class="verdict ng">不正解</div>';
+        ? ['unknown', '正しい意味']
+        : ['ng', '不正解'];
+  // 問題文にスペイン語が出ていない形式（日本語→スペイン語）だけ、ここで表記と発音を見せる
+  const showEs = entry.dir !== 'es-ja';
   let extra = '';
   if (q.pending) {
     extra = `
-      <p>あなたの答え：<b>${esc(q.text)}</b></p>
-      <p class="small">登録されている答えと一致しなかったため、自動では判定できませんでした。正解例と比べて、どちらにするか選んでください。</p>
-      <div class="row">
-        <button class="btn ok" data-action="self-judge" data-value="correct">正解として記録</button>
-        <button class="btn" data-action="self-judge" data-value="wrong">復習に回す</button>
-      </div>`;
+      <p class="small">あなたの答え：<b>${esc(q.text)}</b>（自動で判定できません。下のボタンで選んでください）</p>`;
   } else if (q.result === 'wrong' && q.matched) {
     extra = `<p class="small">「${esc(q.text)}」は <b>${esc(q.matched.es)}</b> の意味です。</p>`;
   } else if (q.result === 'wrong' && q.picked && entry.answerMode === 'choice') {
     const p = getItem(q.picked);
     extra = `<p class="small">選んだ <b>${esc(labelFor(p, entry.dir))}</b> は「${esc(entry.dir === 'es-ja' ? p.es : p.ja)}」です。</p>`;
   }
-  if (q.result && q.result !== 'correct' && !q.pending) {
-    extra += `<p class="small muted">${RULES.requeueGap}問ほど後に、もう一度出題します。</p>`;
-  }
   return `
-  <div class="feedback">
-    ${head}
-    <div class="answer-card">
-      <div class="ans-es">${esWithArticle(item)} <button class="icon-btn" data-action="play" data-id="${esc(item.id)}" aria-label="発音">🔊</button></div>
-      <div class="ans-ja">${esc(item.ja)}</div>
-      ${others.length ? `<div class="small muted">ほかの正解：${others.map(esc).join('、')}</div>` : ''}
-      ${item.hint ? `<div class="small hint">💡 ${esc(item.hint)}</div>` : ''}
-      ${item.note ? `<div class="small hint">💬 ${esc(item.note)}</div>` : ''}
+  <div class="feedback ${verdict[0]}">
+    <div class="fb-head">
+      <span class="verdict">${verdict[1]}</span>
+      <span class="ans-ja">${esc(item.ja)}</span>
     </div>
+    ${showEs ? `<div class="ans-es">${esWithArticle(item)} <button class="icon-btn" data-action="play" data-id="${esc(item.id)}" aria-label="発音を聞く">🔊</button></div>${ipaLine(item)}` : ''}
+    ${others.length ? `<div class="small muted">ほかの正解：${others.map(esc).join('、')}</div>` : ''}
+    ${item.hint ? `<div class="small hint">💡 ${esc(item.hint)}</div>` : ''}
+    ${item.note ? `<div class="small hint">💬 ${esc(item.note)}</div>` : ''}
     ${extra}
-    ${q.pending ? '' : '<button class="btn primary wide big" data-action="next">次へ</button>'}
   </div>`;
 }
 
 // 回答を確定して保存する（同じ問題への二重保存はしない）
-function commitAnswer(result, { judgedBy = 'auto' } = {}) {
+// 回答した直後の音：正解なら効果音、そのあと正しいスペイン語を読み上げる（設定で切り替え可）
+// 画面操作の処理の中で呼ぶこと（iPhoneは操作と無関係な音の再生を止めるため）
+function answerSounds(item, { chime = false, speak = true } = {}) {
+  const s = settings();
+  const wait = chime && s.sfx !== 'off' ? sp.playChime() : 0;
+  if (!speak || s.autoSpeak === 'off') return;
+  const q = ui.q;
+  setTimeout(() => {
+    if (ui.q === q && ui.screen === 'quiz') say(item.es).catch(() => {});
+  }, wait);
+}
+
+function commitAnswer(result, { judgedBy = 'auto', speak = true } = {}) {
   const q = ui.q;
   const u = me();
   const sn = u.session;
@@ -494,6 +525,7 @@ function commitAnswer(result, { judgedBy = 'auto' } = {}) {
   store.saveSession(u.profile.user_id, sn);
   sp.stopListening();
   render();
+  answerSounds(item, { chime: result === 'correct', speak });
 }
 
 function nextQuestion() {
@@ -557,7 +589,7 @@ function screenList() {
       ${rows.map(({ w, st }) => `
         <li>
           <button class="icon-btn" data-action="play" data-id="${w.id}" aria-label="発音">🔊</button>
-          <div class="wl-main"><div class="es">${esWithArticle(w)}</div><div class="ja">${esc(w.ja)}</div></div>
+          <div class="wl-main"><div class="es">${esWithArticle(w)}</div>${ipaLine(w)}<div class="ja">${esc(w.ja)}</div></div>
           <div class="wl-side"><span class="badge ${st}">${STATUS_LABEL[st]}</span>
             <span class="mini">${ja(w) ? '日→西✓' : ''} ${li(w) ? '聞✓' : ''}</span></div>
         </li>`).join('')}
@@ -579,6 +611,7 @@ function screenPhrases() {
         const st = itemStatus(u.states, p);
         return `<li>
           <div class="ph-head"><div class="es">${esc(p.es)}</div><button class="icon-btn" data-action="play" data-id="${p.id}" aria-label="読み上げ">🔊</button></div>
+          ${ipaLine(p)}
           <div class="ja">${esc(p.ja)}</div>
           ${p.note ? `<div class="small muted">${esc(p.note)}</div>` : ''}
           <span class="badge ${st}">${STATUS_LABEL[st]}</span>
@@ -670,6 +703,13 @@ function screenSettings() {
     ${seg('choices', String(s.choices), [['4', '4択'], ['5', '5択']])}
     <label class="field-label">発音の速さ</label>
     ${seg('rate', String(s.rate), [['0.6', 'ゆっくり'], ['0.9', 'ふつう'], ['1.1', '速め']])}
+    <label class="field-label">回答したら発音を読み上げる</label>
+    ${seg('autoSpeak', s.autoSpeak, [['on', 'する'], ['off', 'しない']])}
+    <label class="field-label">正解のときの効果音</label>
+    ${seg('sfx', s.sfx, [['on', '鳴らす'], ['off', '鳴らさない']])}
+    <label class="field-label">発音記号</label>
+    ${seg('ipa', s.ipa, [['latam', '中南米'], ['ar', 'アルゼンチン'], ['off', '表示しない']])}
+    <p class="muted small">発音記号は綴りから自動で作った簡略表記です（例：calle ${esc(toIpa('calle', 'latam'))}、アルゼンチン式では ${esc(toIpa('calle', 'ar'))}）。聞き取り問題と日本語→スペイン語の問題では、答えのヒントにならないよう回答後に表示します。</p>
     <label class="field-label">読み上げの声</label>
     ${voices.length ? `<select data-change="voice">
         <option value="">自動（アルゼンチン → 中南米 → スペインの順に選択）</option>
@@ -713,6 +753,7 @@ function screenSettings() {
       </div>
     </form>
     <p class="small">状態：${st.mode === 'local' ? 'この端末だけに保存中' : st.phase === 'error' ? `未保存 ${st.pending}件（${esc(st.message)}）` : st.pending ? `送信待ち ${st.pending}件` : 'クラウドに保存済み'}</p>
+    ${st.mode === 'local' ? `<p class="alert small">いまの記録は、このiPhoneのブラウザの中だけにあります。Safariの「履歴とWebサイトデータを消去」をしたり、ホーム画面のアイコンを削除したりすると消えます。Safariで開いた場合は、しばらく使わないと消えることもあります。合言葉を入れて「接続して保存」を押すと、ここまでの記録もクラウドに移して保存します。</p>` : ''}
     ${st.mode === 'remote' ? '<button class="btn" data-action="sync-now">今すぐ保存</button>' : ''}
   </section>
   <section class="card">
@@ -811,8 +852,10 @@ const actions = {
     go('quiz');
     autoPlayIfListening();
   },
+  // 回答は1問ごとに保存済みなので、確認なしでメニューに戻る（「続きから学習」で再開できる）
   quit: () => {
-    if (confirm('学習を中断しますか？ここまでの回答は保存され、「続きから学習」で再開できます。')) go('home');
+    go('home');
+    toast('ここまでの回答は保存しました。「続きから学習」で再開できます。');
   },
   'play-q': () => playQuestion(),
   play: (el) => {
@@ -836,7 +879,8 @@ const actions = {
   'self-judge': (el) => {
     const q = ui.q;
     if (!q || !q.pending) return;
-    commitAnswer(el.dataset.value === 'correct' ? 'correct' : 'wrong', { judgedBy: 'self' });
+    // 発音は「確認待ち」を表示したときに読み上げ済みなので、ここでは効果音だけ
+    commitAnswer(el.dataset.value === 'correct' ? 'correct' : 'wrong', { judgedBy: 'self', speak: false });
   },
   next: () => nextQuestion(),
   'skip-q': () => {
@@ -903,6 +947,9 @@ const actions = {
   'close-modal': () => { $modal.hidden = true; $modal.innerHTML = ''; },
 };
 
+// iPhoneで、あとから鳴らす効果音・読み上げを許可してもらうため、最初のタップで準備する
+document.addEventListener('pointerdown', () => { sp.unlockAudio(); sp.unlockSpeech(); }, { once: true });
+
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;
@@ -935,7 +982,7 @@ document.addEventListener('submit', async (e) => {
     q.text = form.answer.value;
     const j = judgeInput(q.item, q.text);
     if (j.result === 'empty') { toast('答えを入力するか、「わからない」を押してください。'); return; }
-    if (j.result === 'pending') { q.pending = true; q.answered = true; render(); return; }
+    if (j.result === 'pending') { q.pending = true; q.answered = true; render(); answerSounds(q.item); return; }
     q.matched = j.matched || null;
     commitAnswer(j.result);
   } else if (kind === 'new-user') {

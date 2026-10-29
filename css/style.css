@@ -142,40 +142,69 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 .tag { display: inline-block; font-size: 0.78rem; font-weight: 700; padding: 2px 9px; border-radius: 99px; background: var(--celeste-soft); color: var(--celeste-deep); margin-left: 6px; }
 .qmeta .tag { margin-left: 0; }
 .tag.retry { background: var(--pending-soft); color: var(--pending); }
-.prompt { text-align: center; padding: 10px 0 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.prompt-es { font-size: 2.3rem; font-weight: 800; line-height: 1.2; word-break: break-word; }
-.prompt-ja { font-size: 1.9rem; font-weight: 800; line-height: 1.3; }
+.prompt { text-align: center; padding: 2px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.prompt-row { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; }
+.prompt-es { font-size: 2.2rem; font-weight: 800; line-height: 1.2; word-break: break-word; min-width: 0; }
+.prompt-ja { font-size: 1.8rem; font-weight: 800; line-height: 1.3; }
+.ipa { font-family: "Doulos SIL", "Charis SIL", "Lucida Sans Unicode", "Arial Unicode MS", -apple-system, sans-serif; color: var(--celeste-deep); font-size: 0.95rem; letter-spacing: 0.02em; }
+.prompt .ipa { font-size: 1.1rem; margin-top: -4px; }
+.btn.back { border-color: var(--celeste); color: var(--celeste-deep); background: #fff; }
+.icon-btn.play-icon { width: 52px; height: 52px; font-size: 1.35rem; border-color: var(--celeste); }
+.prompt p { margin: 0; }
 .article { font-size: 0.55em; font-weight: 600; color: var(--muted); vertical-align: middle; }
 .btn.play { border-color: var(--celeste); color: var(--celeste-deep); }
 .play-big {
-  width: 128px; height: 128px; border-radius: 50%; border: 0; cursor: pointer; color: #fff; font-size: 2.4rem;
+  width: 112px; height: 112px; border-radius: 50%; border: 0; cursor: pointer; color: #fff; font-size: 2.4rem;
   background: radial-gradient(circle at 30% 30%, #8fc0ea, var(--celeste-deep)); display: flex; flex-direction: column;
   align-items: center; justify-content: center; box-shadow: 0 4px 0 #1f4f79;
 }
 .play-big span { font-size: 0.85rem; font-weight: 700; margin-top: 2px; }
 .choices { display: grid; gap: 8px; }
 .choice {
-  min-height: 58px; padding: 10px 14px; border-radius: 14px; border: 2px solid var(--line); background: #fff;
+  min-height: 52px; padding: 8px 14px; border-radius: 14px; border: 2px solid var(--line); background: #fff;
   font-size: 1.15rem; font-weight: 700; cursor: pointer; text-align: center; touch-action: manipulation;
 }
 .choice.correct { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
 .choice.wrong { border-color: var(--ng); background: var(--ng-soft); color: var(--ng); }
-.choice.dim { opacity: 0.55; }
+/* 回答後は「正解」と「選んだ答え」だけを残し、次へまでスクロールせずに見えるようにする */
+.choice.dim { display: none; }
+.prompt-es.long { font-size: 1.6rem; }
+.prompt-ja.long { font-size: 1.4rem; }
 .answer-form input { font-size: 1.2rem; text-align: center; }
 .answer-form .row { margin-top: 8px; }
 .answer-form .row .btn { flex: 1; }
 .btn.mic.on { background: var(--ng); border-color: var(--ng); color: #fff; }
 .mic-status { min-height: 1.2em; margin: 4px 0 0; }
-.feedback { margin-top: 12px; }
-.verdict { font-size: 1.4rem; font-weight: 800; text-align: center; padding: 8px; border-radius: 12px; }
-.verdict.ok { color: var(--ok); background: var(--ok-soft); }
-.verdict.ng { color: var(--ng); background: var(--ng-soft); }
-.verdict.unknown { color: var(--celeste-deep); background: var(--celeste-soft); font-size: 1.1rem; }
-.verdict.pending { color: var(--pending); background: var(--pending-soft); }
-.answer-card { border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
-.ans-es { font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 10px; justify-content: space-between; }
-.ans-ja { font-size: 1.25rem; font-weight: 700; margin: 2px 0 6px; }
-.hint { margin-top: 4px; }
+/* 回答後の結果：判定と正しい意味を1つの枠にまとめて高さを抑える */
+.feedback { margin-top: 10px; padding: 10px 12px; border-radius: 14px; border: 2px solid var(--line); display: grid; gap: 4px; }
+.feedback p { margin: 2px 0 0; }
+.feedback.ok { border-color: var(--ok); background: var(--ok-soft); }
+.feedback.ng { border-color: var(--ng); background: var(--ng-soft); }
+.feedback.unknown { border-color: var(--celeste); background: var(--celeste-soft); }
+.feedback.pending { border-color: var(--sun); background: var(--pending-soft); }
+.fb-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.verdict { font-size: 1.15rem; font-weight: 800; }
+.feedback.ok .verdict { color: var(--ok); }
+.feedback.ng .verdict { color: var(--ng); }
+.feedback.unknown .verdict { color: var(--celeste-deep); }
+.feedback.pending .verdict { color: var(--pending); }
+.ans-ja { font-size: 1.3rem; font-weight: 800; min-width: 0; }
+.ans-es { font-size: 1.4rem; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+
+/* 画面下に固定する操作ボタン（ホームバーに重ならないよう余白をとる） */
+.action-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: rgba(255, 255, 255, 0.96); box-shadow: 0 -1px 0 var(--line);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+.action-inner { max-width: 528px; margin: 0 auto; display: flex; gap: 8px; }
+.action-inner .btn { flex: 1; margin: 0; }
+body[data-screen="quiz"] { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+body[data-screen="quiz"] .wrap { padding-top: 6px; }
+body[data-screen="quiz"] .qmeta { margin-bottom: 2px; }
+body[data-screen="quiz"] .feedback .hint, body[data-screen="quiz"] .feedback .muted { font-size: 0.82rem; line-height: 1.4; }
+.card.quiz { padding: 12px 14px 14px; margin-top: 8px; }
+.quiz-top { margin-top: 0; }
 
 /* ---- 結果 ---- */
 .sun-big {
