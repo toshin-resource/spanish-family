@@ -3,6 +3,8 @@
 iPhoneのSafariで使う、家族向けのスペイン語学習Webアプリです。
 仕様書（spanish_vocabulary_app_spec.md）の「初期版」の範囲を実装しています。
 
+**公開URL：https://toshin-resource.github.io/spanish-family/**（iPhoneのSafariで開く）
+
 ## すぐに試す（パソコン）
 
 インストール不要です。このフォルダで次を実行し、ブラウザで http://localhost:8000 を開きます。
