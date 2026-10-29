@@ -33,6 +33,17 @@ function setup() {
   Logger.log('準備ができました。合言葉なしで使えます（合言葉を付けたいときは関数「enableFamilyKey」を実行）。');
 }
 
+// 利用者と学習記録をすべて消して、最初からやり直す（エディタから実行する。アプリからは呼べない）
+// 消した内容は、スプレッドシートの「ファイル → 変更履歴」から戻せる
+function resetAllData() {
+  Object.keys(SHEETS).forEach(function (name) {
+    var sh = sheet(name);
+    var last = sh.getLastRow();
+    if (last >= 2) sh.getRange(2, 1, last - 1, SHEETS[name].length).clearContent();
+  });
+  Logger.log('利用者と学習記録をすべて消しました。');
+}
+
 // 合言葉を付けたくなったときに実行する。アプリでは最初に合言葉の入力画面が出るようになる
 function enableFamilyKey() {
   var props = PropertiesService.getScriptProperties();
