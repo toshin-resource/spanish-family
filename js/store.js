@@ -144,6 +144,12 @@ async function call(action, payload = {}) {
   }
   if (!json.ok) {
     // サーバー側で合言葉が設定されている場合は、入力画面を出す
+    // クラウドから消された利用者は、この端末からも消す（送り残しも含めて）
+    if (json.error === 'この利用者は登録されていません' && payload.user_id) {
+      forgetUser(payload.user_id);
+      persist();
+      setTimeout(emit);
+    }
     if (json.error === '合言葉が違います') {
       db.remote.keyRequired = true;
       db.remote.key = '';
@@ -201,16 +207,21 @@ export async function refreshUsers() {
     if (!db.users[p.user_id]) db.users[p.user_id] = blankUser(p);
     else db.users[p.user_id].profile = { ...db.users[p.user_id].profile, ...p };
   }
-  // クラウドにつなぐ前にこの端末で登録した人は、同じIDのままクラウドにも登録して記録を引き継ぐ
-  for (const u of Object.values(db.users)) {
-    if (known.has(u.profile.user_id)) continue;
-    await call('createUser', { user: u.profile });
-    markUser(u.profile.user_id);
-    const keys = Object.keys(u.states);
-    if (keys.length) db.outbox.states[u.profile.user_id] = Object.fromEntries(keys.map((k) => [k, true]));
+  // 利用者の一覧はクラウドが正。クラウドから消された人は、この端末からも記録ごと消す
+  for (const id of Object.keys(db.users)) {
+    if (!known.has(id)) forgetUser(id);
   }
   persist();
+  emit();
   return users();
+}
+
+function forgetUser(id) {
+  delete db.users[id];
+  db.outbox.answers = db.outbox.answers.filter((a) => a.user_id !== id);
+  delete db.outbox.states[id];
+  delete db.outbox.users[id];
+  if (db.currentUid === id) db.currentUid = '';
 }
 
 export function nameTaken(name) {

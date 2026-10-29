@@ -103,7 +103,11 @@ function renderSave(s = store.status()) {
 }
 store.onStatus(renderSave);
 // サーバーが合言葉を求めてきたときだけ、入力画面に切り替える
-store.onStatus(() => { if (store.needsKey() && ui.screen !== 'passcode') render(); });
+store.onStatus(() => {
+  if (store.needsKey() && ui.screen !== 'passcode') render();
+  // 選んでいた利用者がクラウドから消された場合は、利用者の選択に戻る
+  else if (!me() && !['users', 'passcode', 'settings'].includes(ui.screen)) { ui.screen = 'users'; render(); loadUsers(); }
+});
 
 // ---------- 利用者選択 ----------
 function screenUsers() {
