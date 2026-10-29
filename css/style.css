@@ -83,6 +83,7 @@ h2 { font-size: 1.1rem; }
 .row > input { flex: 1; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .grid2 .btn { margin: 0; }
+.grid2 .span2 { grid-column: 1 / -1; }
 input, select {
   width: 100%; min-height: var(--tap); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px;
   background: #fff; font-size: 17px; /* 16px以上でiPhoneの自動拡大を防ぐ */

@@ -31,7 +31,6 @@ function fresh() {
     users: {},
     outbox: { answers: [], states: {}, users: {} },
     remote: { url: APP_CONFIG.GAS_URL || '', key: '' },
-    familyCache: null,
   };
 }
 
@@ -201,6 +200,7 @@ export function currentUid() {
 // サーバーに登録済みの家族一覧を取り込む（記録は利用者を選んだときに読み込む）
 export async function refreshUsers() {
   if (!remoteEnabled()) return users();
+  const requestedAt = Date.now();
   const r = await call('listUsers');
   const known = new Set(r.users.map((p) => p.user_id));
   for (const p of r.users) {
@@ -208,8 +208,9 @@ export async function refreshUsers() {
     else db.users[p.user_id].profile = { ...db.users[p.user_id].profile, ...p };
   }
   // 利用者の一覧はクラウドが正。クラウドから消された人は、この端末からも記録ごと消す
-  for (const id of Object.keys(db.users)) {
-    if (!known.has(id)) forgetUser(id);
+  // （一覧を問い合わせたあとにこの端末で登録した人は、古い一覧に載っていないだけなので消さない）
+  for (const [id, u] of Object.entries(db.users)) {
+    if (!known.has(id) && !(u.registeredAt >= requestedAt)) forgetUser(id);
   }
   persist();
   emit();
@@ -235,7 +236,7 @@ export async function createUser(displayName) {
     const r = await call('createUser', { user: profile });
     Object.assign(profile, r.user);
   }
-  db.users[profile.user_id] = blankUser(profile);
+  db.users[profile.user_id] = { ...blankUser(profile), registeredAt: Date.now() };
   db.currentUid = profile.user_id;
   persist();
   emit();
@@ -292,7 +293,7 @@ export function updateSettings(id, patch) {
   u.settingsUpdatedAt = Date.now();
   markUser(id);
   persist();
-  scheduleSync();
+  queueSync();
 }
 
 export function saveSession(id, session) {
@@ -301,7 +302,7 @@ export function saveSession(id, session) {
   u.sessionUpdatedAt = Date.now();
   markUser(id);
   persist();
-  scheduleSync();
+  queueSync();
 }
 
 export function addTodaySet(id, date) {
@@ -318,8 +319,8 @@ export function recordAnswer(id, answer, key, state) {
   db.outbox.answers.push(answer);
   (db.outbox.states[id] ||= {})[key] = true;
   persist();
-  // 保存先はクラウド。回答のたびにすぐ送る（オフラインのときは端末に一時保存して、つながったら送る）
-  scheduleSync(200);
+  // 回答は端末にためておき、まとめてクラウドへ送る（queueSync を参照）
+  queueSync();
 }
 
 // 回答のあとで学習状態だけを直す（「まだ覚えていない」を選んだときなど）
@@ -328,10 +329,24 @@ export function updateState(id, key, state) {
   u.states[key] = state;
   (db.outbox.states[id] ||= {})[key] = true;
   persist();
-  scheduleSync(200);
+  queueSync();
 }
 
 // ---------- 送信 ----------
+// まとめて保存：回答が BATCH_SIZE 件たまったら、または最後の操作から IDLE_MS たったら送る。
+// ほかに、セットの終わり・ホームに戻ったとき・アプリを閉じたときにも送る（app.js から syncNow を呼ぶ）
+const BATCH_SIZE = 10;
+const IDLE_MS = 120000;
+let lazyTimer = null;
+
+export function queueSync() {
+  if (!remoteEnabled()) return;
+  emit();
+  if (db.outbox.answers.length >= BATCH_SIZE) { scheduleSync(300); return; }
+  clearTimeout(lazyTimer);
+  lazyTimer = setTimeout(() => { syncNow().catch(() => {}); }, IDLE_MS);
+}
+
 let timer = null;
 let running = null;
 let retryDelay = 3000;
@@ -345,6 +360,7 @@ export function scheduleSync(delay = 300) {
 
 export async function syncNow() {
   if (!remoteEnabled()) return;
+  clearTimeout(lazyTimer);
   if (running) return running;
   if (!pendingCount()) { syncState = { phase: 'idle', message: '' }; emit(); return; }
   // オフライン中は送らずに待つ（「online」になったら自動で送る）
@@ -372,7 +388,7 @@ export async function syncNow() {
             session: u.session,
             sessionUpdatedAt: u.sessionUpdatedAt,
             today: u.today,
-            // 家族画面はこの集計を表示する（本人のホームと同じ計算で、数字を一致させる）
+            // スプレッドシートの users シートに、ホームと同じ計算の集計を残す（進み具合をシートで確認できる）
             summary: { ...summarize(u.states), date: todayKey() },
           },
         });
@@ -402,22 +418,6 @@ export async function syncNow() {
     if (pendingCount()) scheduleSync(200);
   })();
   return running;
-}
-
-// ---------- 家族の学習状況 ----------
-export async function familySummary() {
-  if (remoteEnabled()) {
-    const r = await call('familySummary');
-    db.familyCache = { at: Date.now(), list: r.users };
-    persist();
-    return { source: 'remote', list: r.users };
-  }
-  const list = users().map((p) => ({ ...p, summary: { ...summarize(db.users[p.user_id].states), date: todayKey() } }));
-  return { source: 'local', list };
-}
-
-export function cachedFamily() {
-  return db.familyCache;
 }
 
 // バックアップ用：この端末に保存している記録を書き出す

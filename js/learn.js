@@ -297,7 +297,7 @@ export function buildQueue(states, cfg, { today = todayKey(), todaySet = false }
   return chosen.map((c) => ({ ...c, mode: presentation, answerMode }));
 }
 
-// ---------- 集計（ホームと家族画面で同じ定義を使う） ----------
+// ---------- 集計（ホーム画面とスプレッドシートの集計欄で同じ定義を使う） ----------
 // 覚えた単語数 = スペイン語→日本語（文字あり）で習得済みの、異なる単語IDの数
 export function summarize(states, today = todayKey()) {
   const sets = {

@@ -20,7 +20,6 @@ const ui = {
   result: null, // 直前の学習の結果
   list: { filter: 'all', scope: '1' },
   phraseCat: 'あいさつ',
-  family: null,
   usersError: '',
   busy: false,
 };
@@ -38,9 +37,10 @@ function esWithArticle(item) {
 }
 
 // 単語の下の補足行：発音記号（設定で「表示しない」にもできる）と品詞（名詞・動詞など）
-function ipaLine(item) {
+// withIpa:false は日本語→スペイン語の問題文用（答えのヒントになる発音記号は出さない）
+function ipaLine(item, { withIpa = true } = {}) {
   const v = settings().ipa;
-  const ipa = v === 'off' ? '' : `<span class="ipa" lang="es-fonipa">${esc(toIpa(item.es, v))}</span>`;
+  const ipa = !withIpa || v === 'off' ? '' : `<span class="ipa" lang="es-fonipa">${esc(toIpa(item.es, v))}</span>`;
   const pos = item.pos ? `<span class="pos">${esc(item.pos)}</span>` : '';
   return ipa || pos ? `<div class="sub">${ipa}${pos}</div>` : '';
 }
@@ -82,6 +82,8 @@ function seg(name, value, options) {
 function go(screen) {
   sp.stopListening();
   sp.stopSpeaking();
+  // 学習画面を離れるとき（セットの終わり・ホームへ戻るなど）に、ためておいた回答をまとめて保存する
+  if (ui.screen === 'quiz' && screen !== 'quiz') store.syncNow().catch(() => {});
   ui.screen = screen;
   if (screen !== 'quiz') ui.q = null;
   render();
@@ -97,7 +99,7 @@ function renderSave(s = store.status()) {
   else if (s.phase === 'offline') html = `<span class="dot err"></span>オフライン${s.pending ? `：${s.pending}件を一時保存中` : ''}`;
   else if (s.phase === 'saving') html = '<span class="dot busy"></span>保存中…';
   else if (s.phase === 'error') html = `<button class="linkish" data-action="sync-now"><span class="dot err"></span>未保存 ${s.pending}件・再試行</button>`;
-  else if (s.phase === 'pending') html = `<span class="dot busy"></span>送信待ち ${s.pending}件`;
+  else if (s.phase === 'pending') html = `<span class="dot busy"></span>まとめて保存待ち ${s.pending}件`;
   else html = '<span class="dot ok"></span>クラウドに保存済み';
   $save.innerHTML = html;
 }
@@ -210,7 +212,8 @@ function screenHome() {
   <section class="card">
     <div class="kind-switch">
       ${seg('kind', s.kind, [['word', '単語学習'], ['phrase', '日常フレーズ集']])}
-      ${seg('dir', s.dir, [['es-ja', 'スペイン語→日本語'], ['ja-es', '日本語→スペイン語']])}
+      ${seg('homeDir', m.dir, [['es-ja', 'スペイン語→日本語'], ['ja-es', '日本語→スペイン語']])}
+      ${m.dir === 'mix' ? '<p class="muted small center">いまはミックス（両方向）で出題します</p>' : ''}
     </div>
     <button class="btn today" data-action="today">
       <span class="today-title">今日の${s.setSize}問</span>
@@ -223,8 +226,7 @@ function screenHome() {
       <button class="btn" data-action="unmastered">未習得だけ復習</button>
       <button class="btn" data-action="go" data-to="list">単語リスト</button>
       <button class="btn" data-action="go" data-to="phrases">フレーズ集</button>
-      <button class="btn" data-action="go" data-to="family">家族の学習状況</button>
-      <button class="btn" data-action="go" data-to="settings">設定</button>
+      <button class="btn span2" data-action="go" data-to="settings">設定</button>
     </div>
     <button class="btn ghost wide" data-action="a2hs">ホーム画面に追加する方法</button>
   </section>`;
@@ -325,10 +327,14 @@ function currentEntry() {
 
 function prepareQuestion() {
   const sn = me().session;
+  // 表示中の問題を使い続けるのは、同じ学習回の同じ問題のときだけ
+  // （回答後は pos が1つ進んでいるので index === pos - 1。最後の問題でも結果と評価ボタンを出す）
+  if (ui.q && ui.q.sessionId === sn.id) {
+    if (ui.q.done && ui.q.index === sn.pos - 1) return ui.q;
+    if (!ui.q.done && ui.q.index === sn.pos) return ui.q;
+  }
   const entry = currentEntry();
   if (!entry) return null;
-  if (ui.q && ui.q.sessionId === sn.id && ui.q.index === sn.pos && !ui.q.done) return ui.q;
-  if (ui.q && ui.q.done) return ui.q; // 回答後の画面（「次へ」を待つ）
   const item = getItem(entry.id);
   const s = settings();
   ui.q = {
@@ -408,7 +414,7 @@ function screenQuiz() {
   } else {
     prompt = `
       <div class="prompt-ja${item.ja.length > 9 ? ' long' : ''}">${esc(item.ja)}</div>
-      ${item.pos ? `<div class="sub"><span class="pos">${esc(item.pos)}</span></div>` : ''}
+      ${ipaLine(item, { withIpa: false })}
       ${revealed ? '' : '<p class="muted small center">発音は回答後に聞けます。</p>'}`;
   }
 
@@ -657,53 +663,6 @@ function screenPhrases() {
   </section>`;
 }
 
-// ---------- 家族の学習状況 ----------
-function screenFamily() {
-  const f = ui.family;
-  const today = todayKey();
-  let body;
-  if (!f) body = '<p class="muted">読み込み中…</p>';
-  else if (f.error) body = `<p class="alert">${esc(f.error)}</p><button class="btn" data-action="load-family">もう一度読み込む</button>`;
-  else {
-    body = f.list.map((p) => {
-      const s = p.summary;
-      const isMe = p.user_id === store.currentUid();
-      if (!s) return `<div class="fam"><div class="fam-name">${esc(p.display_name)}</div><p class="muted small">まだ記録がありません</p></div>`;
-      const fresh = s.date === today;
-      const stg = s.stage || {};
-      return `<div class="fam ${isMe ? 'me' : ''}">
-        <div class="fam-name">${esc(p.display_name)}${isMe ? '<span class="tag">あなた</span>' : ''}</div>
-        <div class="fam-big"><span>${s.masteredWords}</span>語</div>
-        <div class="small muted">覚えた単語（スペイン語→日本語・文字あり）</div>
-        <dl class="fam-stats">
-          <dt>学習段階</dt><dd>${esc(stg.label || '—')}：${stg.mastered ?? 0} / ${stg.total ?? 0}語 習得</dd>
-          <dt>今日学習した単語</dt><dd>${fresh ? s.todayWords : 0}語</dd>
-          <dt>覚えたフレーズ</dt><dd>${s.masteredPhrases}</dd>
-          <dt>最終学習日</dt><dd>${fmtDay(s.lastDay)}</dd>
-        </dl>
-      </div>`;
-    }).join('');
-    body += `<p class="muted small">${f.source === 'local' ? 'この端末に登録されている家族の記録です。' : 'クラウドに保存された記録です（各自が最後に保存した時点）。'}閲覧しても学習中の利用者は切り替わりません。</p>`;
-  }
-  return `
-  <section class="card">
-    <h1 class="title">家族の学習状況</h1>
-    <div class="fam-list">${body}</div>
-  </section>`;
-}
-
-async function loadFamily() {
-  ui.family = null;
-  render();
-  try {
-    await store.syncNow().catch(() => {});
-    ui.family = await store.familySummary();
-  } catch (e) {
-    ui.family = { error: `読み込めませんでした：${e.message}` };
-  }
-  if (ui.screen === 'family') render();
-}
-
 // ---------- 設定 ----------
 function reviewSchedule(states) {
   const t = todayKey();
@@ -776,7 +735,7 @@ function screenSettings() {
   ${userPart}
   <section class="card" id="cloud">
     <h2>クラウド保存（家族で共有）</h2>
-    <p class="small">Googleスプレッドシートに記録を保存します。家族共通の「合言葉」を知っている人だけが読み書きできます。準備の手順は README を見てください。</p>
+    <p class="small">Googleスプレッドシートに記録を保存します。スプレッドシート自体は非公開ですが、いまは合言葉なしの設定のため、保存先のURLを知っている人は記録を読み書きできます（合言葉を付けるときは、サーバー側で設定してから下に入力します）。準備の手順は README を見てください。</p>
     <form data-form="cloud">
       <label class="field-label">Apps Script のURL（…/exec）</label>
       <input name="url" inputmode="url" autocomplete="off" value="${esc(r.url)}" placeholder="https://script.google.com/macros/s/…/exec">
@@ -790,7 +749,7 @@ function screenSettings() {
       : st.phase === 'offline' ? `オフライン。${st.pending ? `${st.pending}件をこの端末に一時保存し、インターネットにつながったら自動で送ります` : '送り残しはありません'}`
       : st.phase === 'error' ? `未保存 ${st.pending}件（${esc(st.message)}）。自動で再試行します`
       : st.pending ? `送信待ち ${st.pending}件` : 'クラウドに保存済み'}</p>
-    ${st.mode === 'remote' ? '<p class="muted small">記録はクラウドに保存します。インターネットにつながっていないときだけ、この端末に一時保存し、つながったら自動で送ります。</p>' : ''}
+    ${st.mode === 'remote' ? '<p class="muted small">記録は端末にためておき、まとめてクラウドに保存します（10問ごと・セットの終わり・ホームに戻ったとき・アプリを閉じたとき）。インターネットにつながっていないときは、つながったら自動で送ります。</p>' : ''}
     ${st.mode === 'local' ? `<p class="alert small">いまの記録は、このiPhoneのブラウザの中だけにあります。Safariの「履歴とWebサイトデータを消去」をしたり、ホーム画面のアイコンを削除したりすると消えます。Safariで開いた場合は、しばらく使わないと消えることもあります。合言葉を入れて「接続して保存」を押すと、ここまでの記録もクラウドに移して保存します。</p>` : ''}
     ${st.mode === 'remote' ? '<button class="btn" data-action="sync-now">今すぐ保存</button>' : ''}
   </section>
@@ -819,7 +778,7 @@ function showA2HS() {
       <li>メニューを下へ動かし、<b>「ホーム画面に追加」</b>を選びます。</li>
       <li>名前を確認し、「Webアプリとして開く」が表示されたらオンにして、<b>「追加」</b>を押します。</li>
     </ol>
-    <p class="muted small">追加後はホーム画面のアイコンから始められます。最初に開いたときは、利用者の選択やクラウド保存の合言葉の入力が必要になることがあります。読み上げ・音声入力・保存には通信が必要な場合があります。</p>
+    <p class="muted small">追加後はホーム画面のアイコンから始められます。最初に開いたときは、利用者を選び直す必要があります。読み上げ・音声入力・保存には通信が必要な場合があります。</p>
     <button class="btn primary wide" data-action="close-modal">閉じる</button>
   </div>`;
   $modal.hidden = false;
@@ -828,7 +787,7 @@ function showA2HS() {
 // ---------- 描画 ----------
 const SCREENS = {
   users: screenUsers, home: screenHome, setup: screenSetup, quiz: screenQuiz, result: screenResult,
-  list: screenList, phrases: screenPhrases, family: screenFamily, settings: screenSettings,
+  list: screenList, phrases: screenPhrases, settings: screenSettings,
   passcode: screenPasscode,
 };
 
@@ -853,13 +812,19 @@ function renderHeader() {
 // ---------- 操作 ----------
 const actions = {
   go: (el) => {
-    if (el.dataset.to === 'family') { go('family'); loadFamily(); return; }
     go(el.dataset.to);
   },
   set: (el) => {
     const { name, value } = el.dataset;
     if (name === 'list-scope') { ui.list.scope = value; return render(); }
     if (name === 'list-filter') { ui.list.filter = value; return render(); }
+    // ホームの方向切り替え：聞き取りは「音声→日本語」だけなので、日本語→スペイン語を選んだら文字ありに戻す
+    if (name === 'homeDir') {
+      const patch = { dir: value };
+      if (value === 'ja-es') patch.presentation = 'text';
+      store.updateSettings(store.currentUid(), patch);
+      return render();
+    }
     const patch = {};
     patch[name] = ['setSize', 'choices'].includes(name) ? Number(value) : name === 'rate' ? Number(value) : value;
     store.updateSettings(store.currentUid(), patch);
@@ -870,27 +835,35 @@ const actions = {
     try {
       await store.selectUser(el.dataset.id);
     } catch (e) {
-      toast(`クラウドから記録を読み込めませんでした（${e.message}）。この端末の記録で続けます。`, 5000);
+      toast(me()
+        ? `クラウドから記録を読み込めませんでした（${e.message}）。この端末の記録で続けます。`
+        : 'この利用者はクラウドから削除されています。一覧を読み込み直しました。', 5000);
     }
     ui.busy = false;
+    if (!me()) { go('users'); loadUsers(); return; }
     go('home');
   },
   'reload-users': () => loadUsers(),
-  'switch-user': () => { store.signOut(); ui.family = null; go('users'); loadUsers(); },
+  'switch-user': () => { store.signOut(); go('users'); loadUsers(); },
   'open-cloud': () => { go('settings'); setTimeout(() => document.getElementById('cloud')?.scrollIntoView()); },
   today: () => {
     const u = me();
     const s = settings();
     const sn = u.session;
-    if (sn && sn.type === 'today' && sn.date === todayKey() && sn.pos < sn.queue.length) return resumeSession();
-    startSession({ ...homeCfg(s), target: 'all' }, 'today');
+    // 最後の問題まで答えたまま閉じていた場合は、先にそのセットを締めくくる（達成の記録と結果表示）
+    if (sn && sn.pos >= sn.queue.length) return finishSession();
+    const cfg = { ...homeCfg(s), target: 'all' };
+    // 途中のセットは、内容・方向・形式が今の選択と同じときだけ続きから。違えば新しいセットにする（回答済みの分は保存済み）
+    const same = sn && ['kind', 'dir', 'presentation', 'answerMode', 'scope'].every((k) => sn.cfg?.[k] === cfg[k]);
+    if (sn && sn.type === 'today' && sn.date === todayKey() && same) return resumeSession();
+    startSession(cfg, 'today');
   },
   resume: () => resumeSession(),
   start: () => startSession(homeCfg(), 'normal'),
   unmastered: () => startSession({ ...homeCfg(), target: 'unmastered' }, 'normal'),
+  // その場面だけのクイズ。設定（今日の○問の範囲など）は変えない
   'phrase-quiz': () => {
-    store.updateSettings(store.currentUid(), { kind: 'phrase', phraseScope: ui.phraseCat });
-    startSession({ ...homeCfg(), target: 'all' }, 'normal');
+    startSession({ ...homeCfg(), kind: 'phrase', scope: ui.phraseCat, target: 'all' }, 'normal');
   },
   'retry-missed': () => {
     const r = ui.result;
@@ -1008,7 +981,6 @@ const actions = {
     render();
   },
   'phrase-cat': (el) => { ui.phraseCat = el.dataset.value; render(); },
-  'load-family': () => loadFamily(),
   'sync-now': () => store.syncNow().then(() => toast('保存しました')).catch((e) => toast(`保存できませんでした：${e.message}`, 5000)),
   export: () => {
     const blob = new Blob([store.exportData()], { type: 'application/json' });
