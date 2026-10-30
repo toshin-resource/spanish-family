@@ -294,6 +294,7 @@ const nextSetNo = (s = settings(), lang = LANG.code) => ((s.setNos || {})[lang] 
 
 function startSession(cfg, type) {
   const u = me();
+  sp.primeSpeech(cfg.lang || LANG.code);
   if (type === 'today') cfg = { ...cfg, setNo: nextSetNo(settings(), cfg.lang) };
   const queue = buildQueue(u.states, cfg, { todaySet: type === 'today' });
   if (!queue.length) {
@@ -329,6 +330,7 @@ function startSession(cfg, type) {
 
 function resumeSession() {
   const u = me();
+  sp.primeSpeech(LANG.code);
   if (!u.session) return;
   if (u.session.pos >= u.session.queue.length) { finishSession(); return; }
   go('quiz');
@@ -390,16 +392,21 @@ function prepareQuestion() {
 function autoPlayIfListening() {
   const q = ui.screen === 'quiz' ? prepareQuestion() : null;
   if (!q || q.answered) return;
-  if (q.entry.mode === 'listen') { playQuestion(); return; }
+  const still = () => ui.q === q && ui.screen === 'quiz' && !q.answered && !q.audioError;
+  // 2回続けて読み上げる（1回目が終わって少し間をあけてから2回目）
+  const twice = () => playQuestion()
+    .then(() => new Promise((ok) => setTimeout(ok, 700)))
+    .then(() => { if (still()) playQuestion(); });
+  if (q.entry.mode === 'listen') { twice(); return; }
   if (q.entry.dir !== 'es-ja' || q.item.kind === 'letter' || settings().autoSpeakQuestion === 'off') return;
-  setTimeout(() => { if (ui.q === q && ui.screen === 'quiz' && !q.answered) playQuestion(); }, 1000);
+  setTimeout(() => { if (still()) twice(); }, 1000);
 }
 
 function playQuestion() {
   const q = ui.q;
-  if (!q) return;
+  if (!q) return Promise.resolve();
   q.audioError = false;
-  say(sayText(q.item), q.item.lang)
+  return say(sayText(q.item), q.item.lang)
     .then(() => { if (ui.q === q && q.audioError) { q.audioError = false; render(); } })
     .catch(() => {
       if (ui.q !== q) return;
@@ -767,7 +774,7 @@ function screenSettings() {
     ${seg('choices', String(s.choices), [['4', '4択'], ['5', '5択']])}
     <label class="field-label">発音の速さ</label>
     ${seg('rate', String(s.rate), [['0.6', 'ゆっくり'], ['0.9', 'ふつう'], ['1.1', '速め']])}
-    <label class="field-label">問題を表示して1秒後に発音を読み上げる</label>
+    <label class="field-label">問題を表示して1秒後に発音を読み上げる（2回）</label>
     ${seg('autoSpeakQuestion', s.autoSpeakQuestion, [['on', 'する'], ['off', 'しない']])}
     <label class="field-label">回答したら発音を読み上げる</label>
     ${seg('autoSpeak', s.autoSpeak, [['on', 'する'], ['off', 'しない']])}
@@ -951,6 +958,7 @@ const actions = {
     startSession({ ...homeCfg(), kind: 'letter', scope: el.dataset.value, target: 'all' }, 'normal');
   },
   'retry-missed': () => {
+    sp.primeSpeech(LANG.code);
     const r = ui.result;
     const missed = [...new Set(r.session.log.filter((l) => !l.retry && l.result !== 'correct').map((l) => l.id))];
     const first = r.session.queue.filter((e) => !e.retry);

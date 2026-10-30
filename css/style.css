@@ -314,3 +314,8 @@ details summary { cursor: pointer; margin-top: 10px; font-weight: 600; color: va
 .choice-row .choice { flex: 1; min-width: 0; }
 .choice-row.dim { display: none; }
 .icon-btn.choice-say { width: 48px; height: 48px; border-color: var(--celeste); }
+
+/* 回答後の「まだ覚えていない／覚えた」を大きく押しやすく */
+.action-inner .btn { min-height: 88px; font-size: 1.15rem; border-radius: 18px; white-space: nowrap; padding: 10px 8px; }
+.action-inner .btn:not(.primary):not(.ok) { border-width: 2px; border-color: var(--celeste); color: var(--celeste-deep); }
+body[data-screen="quiz"] { padding-bottom: calc(124px + env(safe-area-inset-bottom)); }

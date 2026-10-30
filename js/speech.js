@@ -133,16 +133,20 @@ export function playChime() {
   }
 }
 
-// iPhoneでは最初の読み上げを画面操作の中で行う必要があるため、最初のタップで無音の読み上げをしておく
-let speechUnlocked = false;
-export function unlockSpeech() {
-  if (speechUnlocked || !ttsSupported()) return;
-  speechUnlocked = true;
+// iPhoneでは、最初の読み上げを画面のタップの中で行わないと、あとから（タイマーで）読み上げても音が出ない。
+// そこで、学習を始めるタップの中で、聞こえない短い読み上げをして準備しておく
+export function primeSpeech(lang = 'es') {
+  if (!ttsSupported()) return;
   try {
-    const u = new SpeechSynthesisUtterance(' ');
+    const u = new SpeechSynthesisUtterance('a');
     u.volume = 0;
+    u.rate = 2;
+    u.lang = BCP47[lang] || 'es-ES';
     synth.speak(u);
   } catch (e) { /* 読み上げなしで続ける */ }
+}
+export function unlockSpeech() {
+  primeSpeech();
 }
 
 // ---------- 音声入力 ----------
