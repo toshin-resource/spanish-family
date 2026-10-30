@@ -308,3 +308,9 @@ details summary { cursor: pointer; margin-top: 10px; font-weight: 600; color: va
 .fb-row.mine .fb-value { font-size: 1rem; }
 .fb-sub { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
 .choice-mark { display: block; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.05em; }
+
+/* 選択肢の横の発音ボタン（日本語→外国語の問題） */
+.choice-row { display: flex; align-items: center; gap: 8px; }
+.choice-row .choice { flex: 1; min-width: 0; }
+.choice-row.dim { display: none; }
+.icon-btn.choice-say { width: 48px; height: 48px; border-color: var(--celeste); }

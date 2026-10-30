@@ -449,7 +449,7 @@ function screenQuiz() {
     prompt = `
       <div class="prompt-ja${item.ja.length > 9 ? ' long' : ''}">${esc(item.ja)}</div>
       ${ipaLine(item, { withIpa: false })}
-      ${revealed ? '' : '<p class="muted small center">発音は回答後に聞けます。</p>'}`;
+      ${revealed || item.kind === 'letter' ? '' : '<p class="muted small center">選択肢の 🔊 で発音を聞けます。</p>'}`;
   }
 
   let answerArea = '';
@@ -464,7 +464,10 @@ function screenQuiz() {
       }
       const roman = entry.dir !== 'es-ja' && c.roman && c.kind !== 'letter' ? `<small class="choice-roman">${esc(c.roman)}</small>` : '';
       const mark = cls === 'correct' ? '<span class="choice-mark">✓ 正解</span>' : cls === 'wrong' ? '<span class="choice-mark">✗ あなたの答え</span>' : '';
-      return `<button class="choice ${cls}" data-action="choose" data-id="${esc(id)}" ${q.answered ? 'disabled' : ''}>${mark}${esc(labelFor(c, entry.dir))}${roman}</button>`;
+      // 日本語→外国語では、各選択肢の発音を聞けるボタンを横に置く（押しても回答にはならない）
+      const sayBtn = entry.dir !== 'es-ja' && c.kind !== 'letter'
+        ? `<button class="icon-btn choice-say" data-action="play" data-id="${esc(id)}" aria-label="${esc(labelFor(c, entry.dir))}の発音を聞く">🔊</button>` : '';
+      return `<div class="choice-row ${cls}"><button class="choice ${cls}" data-action="choose" data-id="${esc(id)}" ${q.answered ? 'disabled' : ''}>${mark}${esc(labelFor(c, entry.dir))}${roman}</button>${sayBtn}</div>`;
     }).join('')}</div>`;
   } else {
     answerArea = `
