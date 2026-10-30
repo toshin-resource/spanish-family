@@ -864,8 +864,7 @@ function screenSettings() {
   <section class="card">
     <h2>その他</h2>
     <button class="btn" data-action="a2hs">ホーム画面に追加する方法</button>
-    <button class="btn" data-action="update-app">アプリを更新（最新版を読み込む）</button>
-    <p class="muted small">いまの版：${esc(APP_VERSION || '—')}</p>
+    <p class="muted small">いまの版：${esc(APP_VERSION || '—')}（新しい版が出ると、ホームの一番上に「更新する」が出ます）</p>
     <button class="btn" data-action="export">記録を書き出す（バックアップ）</button>
     <p class="muted small">単語 ${WORDS.length}語・フレーズ ${PHRASES.length}件を収録。単語の選定は仮のもので、日常会話でよく使う基本語を前に並べています。</p>
   </section>`;
@@ -975,15 +974,19 @@ function fmtDuration(ms) {
 // いま動いている版（読み込んだ app.js の ?v=）と、公開中の index.html の版を比べ、新しければ「更新する」を出す
 const APP_VERSION = new URL(import.meta.url).searchParams.get('v') || '';
 const $update = document.getElementById('update-banner');
+let latestVersion = '';
+function renderUpdateBanner() {
+  const show = !!latestVersion && ['home', 'users'].includes(ui.screen);
+  $update.hidden = !show;
+  if (show) $update.innerHTML = `<span>新しいバージョンがあります</span><button class="btn small primary" data-action="update-app" data-v="${esc(latestVersion)}">更新する</button>`;
+}
 async function checkForUpdate() {
   if (!APP_VERSION || !navigator.onLine) return;
   try {
     const html = await (await fetch(`./index.html?check=${Date.now()}`, { cache: 'no-store' })).text();
     const latest = (html.match(/js\/app\.js\?v=([\w.-]+)/) || [])[1];
-    if (latest && latest !== APP_VERSION) {
-      $update.innerHTML = `<span>新しいバージョンがあります</span><button class="btn small primary" data-action="update-app" data-v="${esc(latest)}">更新する</button>`;
-      $update.hidden = false;
-    }
+    latestVersion = latest && latest !== APP_VERSION ? latest : '';
+    renderUpdateBanner();
   } catch (e) { /* 通信できないときは次の機会に */ }
 }
 // 更新：ためていた記録を先に保存してから、最新の版を読み込み直す
@@ -1013,6 +1016,7 @@ function render() {
   document.body.dataset.screen = ui.screen;
   renderHeader();
   renderSave();
+  renderUpdateBanner();
   if (studyActive() !== !!study.start) flushStudy();
   ensureCountdown();
 }

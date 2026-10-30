@@ -347,3 +347,7 @@ body[data-screen="quiz"] { padding-bottom: calc(124px + env(safe-area-inset-bott
 .example .ex-say { order: 2; align-self: center; }
 /* 秒数のリール選択 */
 .sec-select { font-size: 1.15rem; font-weight: 700; text-align: center; text-align-last: center; }
+/* 新しいバージョンのお知らせを点滅させる（動きを減らす設定の端末では点滅しない） */
+.update-banner { animation: update-blink 1.2s ease-in-out infinite; }
+@keyframes update-blink { 0%, 100% { background: var(--pending-soft); } 50% { background: #ffd65a; } }
+@media (prefers-reduced-motion: reduce) { .update-banner { animation: none; } }
