@@ -351,3 +351,19 @@ body[data-screen="quiz"] { padding-bottom: calc(124px + env(safe-area-inset-bott
 .update-banner { animation: update-blink 1.2s ease-in-out infinite; }
 @keyframes update-blink { 0%, 100% { background: var(--pending-soft); } 50% { background: #ffd65a; } }
 @media (prefers-reduced-motion: reduce) { .update-banner { animation: none; } }
+
+/* ---- 自動再生（聞き流し） ---- */
+.btn.auto-btn { flex-direction: column; gap: 2px; min-height: 64px; font-weight: 800; font-size: 1.1rem; border-color: var(--celeste); color: var(--celeste-deep); }
+.auto-card { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.auto-card .tags { align-self: stretch; display: flex; justify-content: center; gap: 6px; }
+.auto-card .tags .tag { margin-left: 0; }
+.auto-card .sub { justify-content: center; }
+.auto-fx { font-size: 2.3rem; font-weight: 800; line-height: 1.2; word-break: break-word; padding: 2px 12px; border-radius: 12px; }
+.auto-ja { font-size: 1.6rem; font-weight: 800; padding: 2px 12px; border-radius: 12px; }
+.auto-ex { align-self: stretch; text-align: left; border-radius: 14px; }
+/* いま読み上げている部分を黄色でしめす */
+.auto-card .now { background: var(--pending-soft); box-shadow: 0 0 0 2px var(--sun); }
+.auto-controls { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 8px; margin-top: 14px; }
+.auto-controls .btn { margin: 0; min-height: 64px; font-size: 1.05rem; font-weight: 800; white-space: nowrap; padding: 0 6px; }
+.auto-opts { margin-top: 10px; }
+.auto-opts summary { cursor: pointer; font-weight: 700; color: var(--celeste-deep); padding: 6px 0; }

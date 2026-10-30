@@ -4,7 +4,7 @@ import * as sp from './speech.js';
 import { toIpa } from './ipa.js';
 import {
   RULES, WORDS, PHRASES, WORD_STAGES, PHRASE_CATEGORIES, LETTER_CATEGORIES, LANG, LANGS, setLang, langOf, getItem, stateKey, todayKey, addDays,
-  applyResult, applyNotYet, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor,
+  applyResult, applyNotYet, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor, scopeItems,
 } from './learn.js';
 
 const $main = document.getElementById('main');
@@ -106,6 +106,7 @@ function go(screen) {
   sp.stopSpeaking();
   // 学習画面を離れるとき（セットの終わり・ホームへ戻るなど）に、ためておいた回答をまとめて保存する
   if (ui.screen === 'quiz' && screen !== 'quiz') store.syncNow().catch(() => {});
+  if (ui.screen === 'autoplay' && screen !== 'autoplay') stopAuto();
   ui.screen = screen;
   if (screen !== 'quiz') ui.q = null;
   render();
@@ -250,6 +251,7 @@ function screenHome() {
       <span class="today-sub">復習予定 <b>${due}</b>件${sets ? `　今日 ${sets}セット達成 ✓` : ''}</span>
     </button>
     ${session ? `<button class="btn primary wide" data-action="resume">続きから学習（${session.answeredCount || 0} / ${session.target}問 回答済み）</button>` : ''}
+    <button class="btn wide auto-btn" data-action="auto-open"><span>▶ 自動再生（聞き流し）</span><span class="today-sub">${LANG.name}2回 → 日本語1回・例文つき</span></button>
     <div class="grid2">
       <button class="btn" data-action="go" data-to="setup">今日の学習を選ぶ</button>
       <button class="btn" data-action="unmastered">未習得だけ復習</button>
@@ -263,16 +265,21 @@ function screenHome() {
 }
 
 // ---------- 学習の設定（今日の学習を選ぶ） ----------
+// 範囲の選択肢（単語は段階、フレーズは場面、文字は子音・母音など）と、それを保存する設定の名前
+function scopeOptions(kind) {
+  const opts = kind === 'word'
+    ? [['all', 'すべて（順番に）'], ...WORD_STAGES.map((st) => [String(st.id), `${st.label}`])]
+    : kind === 'letter'
+      ? [['all', 'すべての文字'], ...LETTER_CATEGORIES.map((c) => [c, c])]
+      : [['all', 'すべての場面'], ...PHRASE_CATEGORIES.map((c) => [c, c])];
+  return { opts, name: kind === 'word' ? 'wordScope' : kind === 'letter' ? 'letterScope' : 'phraseScope' };
+}
+
 function screenSetup() {
   const s = settings();
   const cfg = homeCfg(s);
   const m = effectiveMode(cfg);
-  const scopeOpts = cfg.kind === 'word'
-    ? [['all', 'すべて（順番に）'], ...WORD_STAGES.map((st) => [String(st.id), `${st.label}`])]
-    : cfg.kind === 'letter'
-      ? [['all', 'すべての文字'], ...LETTER_CATEGORIES.map((c) => [c, c])]
-      : [['all', 'すべての場面'], ...PHRASE_CATEGORIES.map((c) => [c, c])];
-  const scopeName = cfg.kind === 'word' ? 'wordScope' : cfg.kind === 'letter' ? 'letterScope' : 'phraseScope';
+  const { opts: scopeOpts, name: scopeName } = scopeOptions(cfg.kind);
   const notes = [];
   if (cfg.presentation === 'listen') notes.push(`聞き取りは「${LANG.name}の音声 → 日本語で答える」形式です。`);
   if (cfg.dir !== 'es-ja' && cfg.answerMode === 'input' && cfg.presentation !== 'listen') notes.push(`${LANG.name}の入力式はまだないため、この方向は選択式で出題します。`);
@@ -937,12 +944,154 @@ function tickCountdown() {
   }
 }
 
+// ---------- 自動再生（聞き流し） ----------
+// 1語ずつ「外国語を2回 → 日本語を1回」読み上げ、単語・意味・例文を表示して、次の語へ自動で進む
+const auto = { key: '', items: [], pos: 0, playing: false, seq: 0, phase: '', wake: null };
+const AUTO_GAP_MS = 700; // 外国語と日本語のあいだ
+const AUTO_NEXT_MS = 1500; // 次の語へ進む前
+
+function autoKey(s = settings()) {
+  const cfg = homeCfg(s);
+  return [LANG.code, cfg.kind, cfg.scope, s.autoTarget, s.autoOrder].join('|');
+}
+function buildAuto() {
+  const s = settings();
+  const cfg = homeCfg(s);
+  let items = scopeItems(cfg.kind, cfg.scope, LANG.code);
+  if (s.autoTarget === 'unmastered') items = items.filter((it) => itemStatus(me().states, it) !== 'mastered');
+  if (s.autoOrder === 'random') {
+    items = [...items];
+    for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+  }
+  auto.key = autoKey(s);
+  auto.items = items;
+  // 順番どおりのときは、前回止めた語から続ける
+  const saved = s.autoOrder === 'random' ? '' : (s.autoPos || {})[auto.key];
+  auto.pos = Math.max(0, items.findIndex((it) => it.id === saved));
+}
+const autoWait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+function stopAuto() {
+  if (auto.playing) {
+    auto.playing = false;
+    auto.seq++;
+    auto.phase = '';
+    sp.stopSpeaking();
+    flushStudy();
+  }
+  auto.wake?.release?.().catch(() => {});
+  auto.wake = null;
+  const it = auto.items[auto.pos];
+  const s = settings();
+  if (it && s.autoOrder !== 'random' && me() && (s.autoPos || {})[auto.key] !== it.id) {
+    store.updateSettings(store.currentUid(), { autoPos: { ...(s.autoPos || {}), [auto.key]: it.id } });
+  }
+}
+async function startAuto() {
+  if (!auto.items.length) return;
+  sp.primeSpeech(LANG.code);
+  auto.playing = true;
+  const seq = ++auto.seq;
+  noteActivity();
+  // 再生中は画面が暗くならないようにする（対応している端末のみ）
+  navigator.wakeLock?.request('screen').then((w) => { if (seq === auto.seq) auto.wake = w; else w.release(); }).catch(() => {});
+  const live = () => seq === auto.seq && auto.playing && ui.screen === 'autoplay';
+  const s = settings();
+  try {
+    while (live()) {
+      const it = auto.items[auto.pos];
+      const lang = it.lang;
+      auto.phase = 'fx';
+      render();
+      await say(sayText(it), lang, 2);
+      if (!live()) return;
+      await autoWait(AUTO_GAP_MS);
+      if (!live()) return;
+      auto.phase = 'ja';
+      render();
+      await sp.speak(it.ja, { lang: 'ja', rate: 1 });
+      if (!live()) return;
+      if (s.autoExample === 'read' && it.example) {
+        await autoWait(AUTO_GAP_MS);
+        if (!live()) return;
+        auto.phase = 'ex';
+        render();
+        await say(it.example.text, lang);
+        if (!live()) return;
+        await autoWait(400);
+        if (!live()) return;
+        await sp.speak(it.example.ja, { lang: 'ja', rate: 1 });
+        if (!live()) return;
+      }
+      auto.phase = '';
+      render();
+      await autoWait(AUTO_NEXT_MS);
+      if (!live()) return;
+      auto.pos = (auto.pos + 1) % auto.items.length; // 最後まで行ったら最初に戻って続ける
+      noteActivity();
+    }
+  } catch (e) {
+    if (seq !== auto.seq) return;
+    stopAuto();
+    render();
+    toast(`音声を再生できませんでした。マナーモードや音量、${LANG.name}・日本語の声があるかを確認してください。`, 5000);
+  }
+}
+function autoJump(step) {
+  if (!auto.items.length) return;
+  const wasPlaying = auto.playing;
+  stopAuto();
+  auto.pos = (auto.pos + step + auto.items.length) % auto.items.length;
+  if (wasPlaying) startAuto();
+  else render();
+}
+
+function screenAutoplay() {
+  const s = settings();
+  const cfg = homeCfg(s);
+  if (auto.key !== autoKey(s)) {
+    stopAuto();
+    buildAuto();
+  }
+  const { opts, name } = scopeOptions(cfg.kind);
+  const it = auto.items[auto.pos];
+  const ph = auto.playing ? auto.phase : '';
+  const card = it ? `
+    <div class="auto-card">
+      <div class="tags"><span class="tag">${KIND_LABEL[cfg.kind]}</span><span class="tag">${auto.pos + 1} / ${auto.items.length}</span></div>
+      <div class="auto-fx ${ph === 'fx' ? 'now' : ''}" lang="${esc(it.lang)}">${esWithArticle(it)}</div>
+      ${ipaLine(it)}
+      <div class="auto-ja ${ph === 'ja' ? 'now' : ''}">${esc(it.ja)}</div>
+      ${it.example ? `<div class="auto-ex ${ph === 'ex' ? 'now' : ''}">${exampleBlock(it)}</div>` : ''}
+    </div>` : `<p class="muted center">この条件の${KIND_LABEL[cfg.kind]}がありません。範囲や対象を変えてください。</p>`;
+  return `
+  <section class="card auto">
+    ${card}
+    <div class="auto-controls">
+      <button class="btn" data-action="auto-prev">⏮ 前へ</button>
+      <button class="btn primary" data-action="auto-toggle">${auto.playing ? '⏸ 一時停止' : '▶ 再生'}</button>
+      <button class="btn" data-action="auto-next">次へ ⏭</button>
+    </div>
+    <p class="muted small center">${LANG.name}を2回 → 日本語を1回読み、次へ進みます。最後まで行くと最初に戻ります。</p>
+    <details class="auto-opts">
+      <summary>再生の設定</summary>
+      <label class="field-label">範囲</label>
+      ${seg(name, cfg.scope, opts)}
+      <label class="field-label">対象</label>
+      ${seg('autoTarget', s.autoTarget, [['all', '全部'], ['unmastered', '未習得のみ']])}
+      <label class="field-label">順番</label>
+      ${seg('autoOrder', s.autoOrder, [['order', '順番どおり'], ['random', 'シャッフル']])}
+      <label class="field-label">例文の読み上げ</label>
+      ${seg('autoExample', s.autoExample, [['show', '表示だけ'], ['read', '例文も読む']])}
+    </details>
+  </section>`;
+}
+
 // ---------- 学習時間（問題の画面を開いている時間） ----------
 // 1分以上なにも操作がないあいだは数えない（画面を開いたまま置いておいた時間を含めない）
 const study = { start: 0, last: Date.now() };
 const STUDY_IDLE_MS = 60 * 1000;
 function studyActive() {
-  return ui.screen === 'quiz' && document.visibilityState === 'visible' && !!me();
+  return (ui.screen === 'quiz' || (ui.screen === 'autoplay' && auto.playing)) && document.visibilityState === 'visible' && !!me();
 }
 function flushStudy() {
   const now = Date.now();
@@ -1004,7 +1153,7 @@ setInterval(checkForUpdate, 10 * 60 * 1000);
 const SCREENS = {
   users: screenUsers, home: screenHome, setup: screenSetup, quiz: screenQuiz, result: screenResult,
   list: screenList, phrases: screenPhrases, settings: screenSettings,
-  passcode: screenPasscode, letters: screenLetters,
+  passcode: screenPasscode, letters: screenLetters, autoplay: screenAutoplay,
 };
 
 function render() {
@@ -1107,6 +1256,16 @@ const actions = {
     toast('ここまでの回答は保存しました。「続きから学習」で再開できます。');
   },
   'play-q': () => playQuestion(),
+  'auto-open': () => {
+    sp.primeSpeech(LANG.code);
+    go('autoplay');
+    startAuto();
+  },
+  'auto-toggle': () => {
+    if (auto.playing) { stopAuto(); render(); } else startAuto();
+  },
+  'auto-prev': () => autoJump(-1),
+  'auto-next': () => autoJump(1),
   play: (el) => {
     const it = getItem(el.dataset.id);
     say(sayText(it), it.lang).catch(() => toast(`音声を再生できませんでした。マナーモードや音量、${langOf(it).name}の声があるかを確認してください。`, 5000));
@@ -1327,7 +1486,12 @@ window.speechSynthesis?.addEventListener?.('voiceschanged', () => { if (ui.scree
 // アプリに戻ってきたときは、ほかの端末での学習分をクラウドから読み込み直す
 document.addEventListener('visibilitychange', () => {
   flushStudy(); // 学習時間：アプリを閉じたら区切り、戻ったら数え直す
-  if (document.visibilityState === 'hidden') { sp.stopListening(); store.syncNow().catch(() => {}); return; }
+  if (document.visibilityState === 'hidden') {
+    sp.stopListening();
+    if (auto.playing) { stopAuto(); render(); } // 画面を閉じたら自動再生は一時停止
+    store.syncNow().catch(() => {});
+    return;
+  }
   checkForUpdate();
   if (store.remoteEnabled() && store.currentUid() && store.online()) {
     store.pullUser(store.currentUid()).then(() => { if (['home', 'list', 'phrases'].includes(ui.screen)) render(); }).catch(() => {});
