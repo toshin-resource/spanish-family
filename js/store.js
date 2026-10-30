@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = {
   voiceURI: '',
   lang: 'es', // 学習する言語：es スペイン語 / th タイ語
   wordScope: 'all', // 単語の範囲：all（すべてを順番に）/ 1・2 …（その段階だけ）
+  letterScope: 'all', // タイ文字の範囲：all / 子音 / 母音 / 声調記号
   ipa: 'latam', // 発音記号：latam 中南米 / ar アルゼンチン / off 表示しない
   autoSpeak: 'on', // 回答したら発音を読み上げる
   sfx: 'on', // 正解のときに効果音を鳴らす

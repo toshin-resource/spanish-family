@@ -1,12 +1,12 @@
 // 学習ロジック：判定・選択肢・復習スケジュール・出題セット・集計
 import { WORDS as ES_WORDS, WORD_STAGES as ES_STAGES } from './data-words.js';
 import { PHRASES as ES_PHRASES, PHRASE_CATEGORIES } from './data-phrases.js';
-import { THAI_WORDS, THAI_PHRASES, THAI_WORD_STAGES } from './data-thai.js';
+import { THAI_WORDS, THAI_PHRASES, THAI_WORD_STAGES, THAI_LETTERS, LETTER_CATEGORIES } from './data-thai.js';
 
 // 学習できる言語。項目（単語・フレーズ）の id は言語ごとに別なので、学習記録が混ざらない
 export const LANGS = {
-  es: { code: 'es', name: 'スペイン語', short: '西', words: ES_WORDS, phrases: ES_PHRASES, stages: ES_STAGES },
-  th: { code: 'th', name: 'タイ語', short: 'タイ', words: THAI_WORDS, phrases: THAI_PHRASES, stages: THAI_WORD_STAGES },
+  es: { code: 'es', name: 'スペイン語', short: '西', words: ES_WORDS, phrases: ES_PHRASES, stages: ES_STAGES, letters: [] },
+  th: { code: 'th', name: 'タイ語', short: 'タイ', words: THAI_WORDS, phrases: THAI_PHRASES, stages: THAI_WORD_STAGES, letters: THAI_LETTERS },
 };
 
 // いま選んでいる言語。WORDS などは setLang で切り替わる（読み込んだ側にも最新の値が見える）
@@ -30,13 +30,14 @@ export const RULES = {
   maxRetriesPerItem: 2, // 1回の学習で同じ問題を再出題する上限（無限ループ防止）
 };
 
-export { PHRASE_CATEGORIES };
+export { PHRASE_CATEGORIES, LETTER_CATEGORIES };
 
-const BY_ID = new Map(Object.values(LANGS).flatMap((l) => [...l.words, ...l.phrases]).map((it) => [it.id, it]));
+const BY_ID = new Map(Object.values(LANGS).flatMap((l) => [...l.words, ...l.phrases, ...l.letters]).map((it) => [it.id, it]));
 export const getItem = (id) => BY_ID.get(id);
 // lang を省略すると、いま選んでいる言語
 export const itemsOf = (kind, lang = LANG.code) => {
   const l = LANGS[lang] || LANG;
+  if (kind === 'letter') return l.letters; // 文字（いまはタイ語だけ）
   return kind === 'phrase' ? l.phrases : l.words;
 };
 
@@ -246,8 +247,8 @@ export function isDue(state, today = todayKey()) {
 export function effectiveMode(cfg) {
   const presentation = cfg.presentation === 'listen' ? 'listen' : 'text';
   const dir = presentation === 'listen' ? 'es-ja' : cfg.dir;
-  // スペイン語の自由入力は未対応のため、日本語→スペイン語とミックスは選択式にする
-  const answerMode = dir === 'es-ja' ? cfg.answerMode : 'choice';
+  // 学習する言語での自由入力は未対応のため、日本語→外国語とミックスは選択式にする。文字の学習も選択式
+  const answerMode = dir === 'es-ja' && cfg.kind !== 'letter' ? cfg.answerMode : 'choice';
   return { presentation, dir, answerMode };
 }
 
@@ -325,7 +326,7 @@ export function buildQueue(states, cfg, { today = todayKey(), todaySet = false }
 // 覚えた単語数 = スペイン語→日本語（文字あり）で習得済みの、異なる単語IDの数
 export function summarize(states, today = todayKey()) {
   const sets = {
-    words: new Set(), wordsJaEs: new Set(), wordsListen: new Set(), phrases: new Set(),
+    words: new Set(), wordsJaEs: new Set(), wordsListen: new Set(), phrases: new Set(), letters: new Set(),
     todayWords: new Set(), todayPhrases: new Set(),
   };
   let lastDay = '';
@@ -343,6 +344,8 @@ export function summarize(states, today = todayKey()) {
       else sets.wordsJaEs.add(id);
     } else if (kind === 'phrase' && dir === 'es-ja' && mode === 'text') {
       sets.phrases.add(id);
+    } else if (kind === 'letter' && dir === 'es-ja' && mode === 'text') {
+      sets.letters.add(id);
     }
   }
   const stageProgress = WORD_STAGES.map((stg) => ({
@@ -356,6 +359,7 @@ export function summarize(states, today = todayKey()) {
     masteredWordsJaEs: sets.wordsJaEs.size,
     masteredWordsListen: sets.wordsListen.size,
     masteredPhrases: sets.phrases.size,
+    masteredLetters: sets.letters.size,
     todayWords: sets.todayWords.size,
     todayPhrases: sets.todayPhrases.size,
     lastDay,
@@ -364,6 +368,7 @@ export function summarize(states, today = todayKey()) {
     stageProgress,
     totalWords: WORDS.length,
     totalPhrases: PHRASES.length,
+    totalLetters: LANG.letters.length,
   };
 }
 

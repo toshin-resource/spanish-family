@@ -3,7 +3,7 @@ import * as store from './store.js';
 import * as sp from './speech.js';
 import { toIpa } from './ipa.js';
 import {
-  RULES, WORDS, PHRASES, WORD_STAGES, PHRASE_CATEGORIES, LANG, LANGS, setLang, langOf, getItem, stateKey, todayKey, addDays,
+  RULES, WORDS, PHRASES, WORD_STAGES, PHRASE_CATEGORIES, LETTER_CATEGORIES, LANG, LANGS, setLang, langOf, getItem, stateKey, todayKey, addDays,
   applyResult, applyNotYet, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor,
 } from './learn.js';
 
@@ -19,6 +19,7 @@ const ui = {
   result: null, // 直前の学習の結果
   list: { filter: 'all', scope: '1' },
   phraseCat: 'あいさつ',
+  letterCat: '子音',
   usersError: '',
   busy: false,
 };
@@ -30,7 +31,9 @@ const settings = () => ({ ...store.DEFAULT_SETTINGS, ...(me()?.settings || {}) }
 const STATUS_LABEL = { new: '未学習', learning: '学習中', mastered: '習得済み' };
 // 出題方向の表示名（言語名は選んでいる言語、または問題の言語）
 const dirLabel = (dir, name = LANG.name) => ({ 'es-ja': `${name} → 日本語`, 'ja-es': `日本語 → ${name}`, mix: 'ミックス' }[dir]);
-const KIND_LABEL = { word: '単語', phrase: 'フレーズ' };
+const KIND_LABEL = { word: '単語', phrase: 'フレーズ', letter: '文字' };
+// 読み上げる文字列（文字の学習では文字の名前を読む）
+const sayText = (item) => item.speak || item.es;
 
 function esWithArticle(item) {
   return item.article ? `<span class="article">${esc(item.article)}</span> ${esc(item.es)}` : esc(item.es);
@@ -174,13 +177,14 @@ function screenPasscode() {
 
 // ---------- ホーム ----------
 function homeCfg(s = settings()) {
+  const kind = s.kind === 'letter' && !LANG.letters.length ? 'word' : s.kind;
   return {
-    kind: s.kind,
+    kind,
     dir: s.dir,
     answerMode: s.answerMode,
     presentation: s.presentation,
     lang: s.lang,
-    scope: s.kind === 'word' ? s.wordScope : s.phraseScope,
+    scope: kind === 'word' ? s.wordScope : kind === 'letter' ? s.letterScope : s.phraseScope,
     target: s.target,
     count: s.setSize,
   };
@@ -213,19 +217,20 @@ function screenHome() {
       <span class="chip">日本語→${LANG.name} ${sum.masteredWordsJaEs}語</span>
       <span class="chip">聞き取り ${sum.masteredWordsListen}語</span>
       <span class="chip">フレーズ ${sum.masteredPhrases} / ${sum.totalPhrases}</span>
+      ${sum.totalLetters ? `<span class="chip">文字 ${sum.masteredLetters} / ${sum.totalLetters}</span>` : ''}
     </div>
   </section>
 
   <section class="card">
     <div class="kind-switch">
       ${seg('lang', s.lang, Object.values(LANGS).map((l) => [l.code, l.name]))}
-      ${seg('kind', s.kind, [['word', '単語学習'], ['phrase', '日常フレーズ集']])}
+      ${seg('kind', cfg.kind, [['word', '単語学習'], ['phrase', '日常フレーズ集'], ...(LANG.letters.length ? [['letter', 'タイ文字']] : [])])}
       ${seg('homeDir', m.dir, [['es-ja', `${LANG.name}→日本語`], ['ja-es', `日本語→${LANG.name}`]])}
       ${m.dir === 'mix' ? '<p class="muted small center">いまはミックス（両方向）で出題します</p>' : ''}
     </div>
     <button class="btn today" data-action="today">
       <span class="today-title">今日の${s.setSize}問</span>
-      <span class="today-sub">${KIND_LABEL[s.kind]}・${dirLabel(m.dir)}・${m.presentation === 'listen' ? '聞き取り' : m.answerMode === 'input' ? '入力式' : '選択式'}</span>
+      <span class="today-sub">${KIND_LABEL[cfg.kind]}・${dirLabel(m.dir)}・${m.presentation === 'listen' ? '聞き取り' : m.answerMode === 'input' ? '入力式' : '選択式'}</span>
       <span class="today-sub">復習予定 <b>${due}</b>件${sets ? `　今日 ${sets}セット達成 ✓` : ''}</span>
     </button>
     ${session ? `<button class="btn primary wide" data-action="resume">続きから学習（${session.answeredCount || 0} / ${session.target}問 回答済み）</button>` : ''}
@@ -234,7 +239,8 @@ function screenHome() {
       <button class="btn" data-action="unmastered">未習得だけ復習</button>
       <button class="btn" data-action="go" data-to="list">単語リスト</button>
       <button class="btn" data-action="go" data-to="phrases">フレーズ集</button>
-      <button class="btn span2" data-action="go" data-to="settings">設定</button>
+      ${LANG.letters.length ? '<button class="btn" data-action="go" data-to="letters">タイ文字の一覧</button>' : ''}
+      <button class="btn ${LANG.letters.length ? '' : 'span2'}" data-action="go" data-to="settings">設定</button>
     </div>
     <button class="btn ghost wide" data-action="a2hs">ホーム画面に追加する方法</button>
   </section>`;
@@ -245,12 +251,16 @@ function screenSetup() {
   const s = settings();
   const cfg = homeCfg(s);
   const m = effectiveMode(cfg);
-  const scopeOpts = s.kind === 'word'
-    ? [...WORD_STAGES.map((st) => [String(st.id), `${st.label}`]), ['all', 'すべて']]
-    : [['all', 'すべての場面'], ...PHRASE_CATEGORIES.map((c) => [c, c])];
+  const scopeOpts = cfg.kind === 'word'
+    ? [['all', 'すべて（順番に）'], ...WORD_STAGES.map((st) => [String(st.id), `${st.label}`])]
+    : cfg.kind === 'letter'
+      ? [['all', 'すべての文字'], ...LETTER_CATEGORIES.map((c) => [c, c])]
+      : [['all', 'すべての場面'], ...PHRASE_CATEGORIES.map((c) => [c, c])];
+  const scopeName = cfg.kind === 'word' ? 'wordScope' : cfg.kind === 'letter' ? 'letterScope' : 'phraseScope';
   const notes = [];
   if (cfg.presentation === 'listen') notes.push(`聞き取りは「${LANG.name}の音声 → 日本語で答える」形式です。`);
   if (cfg.dir !== 'es-ja' && cfg.answerMode === 'input' && cfg.presentation !== 'listen') notes.push(`${LANG.name}の入力式はまだないため、この方向は選択式で出題します。`);
+  if (cfg.kind === 'letter') notes.push('文字の学習は選択式で出題します。');
   if (cfg.dir === 'mix') notes.push('ミックスは両方向をほぼ半分ずつ出題します。各問に方向を表示します。');
   return `
   <section class="card">
@@ -258,7 +268,7 @@ function screenSetup() {
     <label class="field-label">言語</label>
     ${seg('lang', s.lang, Object.values(LANGS).map((l) => [l.code, l.name]))}
     <label class="field-label">学習する内容</label>
-    ${seg('kind', s.kind, [['word', '単語'], ['phrase', '日常フレーズ']])}
+    ${seg('kind', cfg.kind, [['word', '単語'], ['phrase', '日常フレーズ'], ...(LANG.letters.length ? [['letter', 'タイ文字']] : [])])}
     <label class="field-label">出題方向</label>
     ${seg('dir', s.dir, [['es-ja', `${LANG.name}→日本語`], ['ja-es', `日本語→${LANG.name}`], ['mix', 'ミックス']])}
     <label class="field-label">表示形式</label>
@@ -266,13 +276,13 @@ function screenSetup() {
     <label class="field-label">回答方式</label>
     ${seg('answerMode', s.answerMode, [['choice', '選択式'], ['input', '日本語で入力']])}
     <label class="field-label">範囲</label>
-    ${seg(s.kind === 'word' ? 'wordScope' : 'phraseScope', s.kind === 'word' ? s.wordScope : s.phraseScope, scopeOpts)}
+    ${seg(scopeName, cfg.scope, scopeOpts)}
     <label class="field-label">出題対象</label>
     ${seg('target', s.target, [['all', '全部'], ['unmastered', '未習得のみ'], ['review', '今日の復習のみ']])}
     <label class="field-label">問題数</label>
     ${seg('setSize', String(s.setSize), [['5', '5問'], ['10', '10問'], ['15', '15問'], ['20', '20問'], ['30', '30問']])}
     ${notes.length ? `<ul class="notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
-    <p class="muted small">今の設定：${LANG.name}・${KIND_LABEL[s.kind]}・${dirLabel(m.dir)}・${m.presentation === 'listen' ? '聞き取り' : '文字あり'}・${m.answerMode === 'input' ? '入力式' : '選択式'}</p>
+    <p class="muted small">今の設定：${LANG.name}・${KIND_LABEL[cfg.kind]}・${dirLabel(m.dir)}・${m.presentation === 'listen' ? '聞き取り' : '文字あり'}・${m.answerMode === 'input' ? '入力式' : '選択式'}</p>
     <button class="btn primary wide big" data-action="start">学習を始める</button>
     <button class="btn ghost wide" data-action="go" data-to="home">ホームへ戻る</button>
   </section>`;
@@ -376,7 +386,7 @@ function playQuestion() {
   const q = ui.q;
   if (!q) return;
   q.audioError = false;
-  say(q.item.es, q.item.lang)
+  say(sayText(q.item), q.item.lang)
     .then(() => { if (ui.q === q && q.audioError) { q.audioError = false; render(); } })
     .catch(() => {
       if (ui.q !== q) return;
@@ -397,13 +407,14 @@ function screenQuiz() {
   const pct = Math.round((progressDone / sn.target) * 100);
 
   // 単語と発音ボタンを横に並べて、回答後も「次へ」までスクロールせずに見えるようにする
-  const longEs = item.es.length > 14 ? ' long' : '';
+  const isLetter = item.kind === 'letter';
+  const longEs = isLetter ? ' letter' : item.es.length > 14 ? ' long' : '';
   const esRow = `
       <div class="prompt-row">
         <div class="prompt-es${longEs}">${esWithArticle(item)}</div>
         <button class="icon-btn play-icon" data-action="play-q" aria-label="発音を聞く">🔊</button>
       </div>
-      ${ipaLine(item)}`;
+      ${ipaLine(item, { withIpa: !isLetter || revealed })}`;
   let prompt;
   if (listen && revealed) {
     prompt = esRow;
@@ -438,8 +449,9 @@ function screenQuiz() {
         else if (id === q.picked) cls = 'wrong';
         else cls = 'dim';
       }
-      const roman = entry.dir !== 'es-ja' && c.roman ? `<small class="choice-roman">${esc(c.roman)}</small>` : '';
-      return `<button class="choice ${cls}" data-action="choose" data-id="${esc(id)}" ${q.answered ? 'disabled' : ''}>${esc(labelFor(c, entry.dir))}${roman}</button>`;
+      const roman = entry.dir !== 'es-ja' && c.roman && c.kind !== 'letter' ? `<small class="choice-roman">${esc(c.roman)}</small>` : '';
+      const mark = cls === 'correct' ? '<span class="choice-mark">✓ 正解</span>' : cls === 'wrong' ? '<span class="choice-mark">✗ あなたの答え</span>' : '';
+      return `<button class="choice ${cls}" data-action="choose" data-id="${esc(id)}" ${q.answered ? 'disabled' : ''}>${mark}${esc(labelFor(c, entry.dir))}${roman}</button>`;
     }).join('')}</div>`;
   } else {
     answerArea = `
@@ -484,37 +496,34 @@ function actionBar(q) {
 
 function feedback(q) {
   const { item, entry } = q;
-  const others = item.accepted.slice(1).filter((a) => a !== item.ja);
-  const verdict = q.pending
-    ? ['pending', '確認待ち']
-    : q.result === 'correct'
-      ? ['ok', '正解！']
-      : q.result === 'unknown'
-        ? ['unknown', '正しい意味']
-        : ['ng', '不正解'];
-  // 問題文にスペイン語が出ていない形式（日本語→スペイン語）だけ、ここで表記と発音を見せる
-  const showEs = entry.dir !== 'es-ja';
-  let extra = '';
+  const others = item.kind === 'letter' ? [] : item.accepted.slice(1).filter((a) => a !== item.ja);
+  const kind = q.pending ? 'pending' : q.result === 'correct' ? 'ok' : q.result === 'unknown' ? 'unknown' : 'ng';
+  const banner = { ok: '⭕ 正解！', ng: '❌ 不正解', unknown: '💡 答えを確認しましょう', pending: '❓ 確認待ち' }[kind];
+  // 正しい答え：その問題で選ぶ側の表記（外国語→日本語なら日本語、日本語→外国語なら外国語）
+  const rightLabel = entry.dir === 'es-ja' ? item.ja : item.es;
+  const rightSub = entry.dir === 'es-ja' ? '' : `<span class="fb-sub">${esc(item.ja)}</span>`;
+  let mine = '';
   if (q.pending) {
-    extra = `
-      <p class="small">あなたの答え：<b>${esc(q.text)}</b>（自動で判定できません。下のボタンで選んでください）</p>`;
+    mine = `${esc(q.text)}<span class="fb-sub">自動で判定できません。下のボタンで選んでください</span>`;
   } else if (q.result === 'wrong' && q.matched) {
-    extra = `<p class="small">「${esc(q.text)}」は <b>${esc(q.matched.es)}</b> の意味です。</p>`;
+    mine = `${esc(q.text)}<span class="fb-sub">＝ ${esc(q.matched.es)} の意味</span>`;
   } else if (q.result === 'wrong' && q.picked && entry.answerMode === 'choice') {
     const p = getItem(q.picked);
-    extra = `<p class="small">選んだ <b>${esc(labelFor(p, entry.dir))}</b> は「${esc(entry.dir === 'es-ja' ? p.es : p.ja)}」です。</p>`;
+    mine = `${esc(labelFor(p, entry.dir))}<span class="fb-sub">＝ ${esc(entry.dir === 'es-ja' ? p.es : p.ja)}${entry.dir === 'es-ja' && p.roman ? `（${esc(p.roman)}）` : ''}</span>`;
   }
   return `
-  <div class="feedback ${verdict[0]}">
-    <div class="fb-head">
-      <span class="verdict">${verdict[1]}</span>
-      <span class="ans-ja">${esc(item.ja)}</span>
+  <div class="feedback ${kind}">
+    <div class="verdict-banner">${banner}</div>
+    <div class="fb-row right">
+      <span class="fb-label">正しい答え</span>
+      <span class="fb-value">${esc(rightLabel)}${rightSub}</span>
+      ${entry.dir !== 'es-ja' ? `<button class="icon-btn" data-action="play" data-id="${esc(item.id)}" aria-label="発音を聞く">🔊</button>` : ''}
     </div>
-    ${showEs ? `<div class="ans-es">${esWithArticle(item)} <button class="icon-btn" data-action="play" data-id="${esc(item.id)}" aria-label="発音を聞く">🔊</button></div>${ipaLine(item)}` : ''}
+    ${entry.dir !== 'es-ja' ? ipaLine(item) : ''}
+    ${mine ? `<div class="fb-row mine"><span class="fb-label">あなたの答え</span><span class="fb-value">${mine}</span></div>` : ''}
     ${others.length ? `<div class="small muted">ほかの正解：${others.map(esc).join('、')}</div>` : ''}
     ${item.hint ? `<div class="small hint">💡 ${esc(item.hint)}</div>` : ''}
     ${item.note ? `<div class="small hint">💬 ${esc(item.note)}</div>` : ''}
-    ${extra}
   </div>`;
 }
 
@@ -527,7 +536,7 @@ function answerSounds(item, { chime = false, speak = true } = {}) {
   if (!speak || s.autoSpeak === 'off') return;
   const q = ui.q;
   setTimeout(() => {
-    if (ui.q === q && ui.screen === 'quiz') say(item.es, item.lang).catch(() => {});
+    if (ui.q === q && ui.screen === 'quiz') say(sayText(item), item.lang).catch(() => {});
   }, wait);
 }
 
@@ -674,6 +683,38 @@ function screenPhrases() {
   </section>`;
 }
 
+// ---------- タイ文字の一覧 ----------
+function screenLetters() {
+  const u = me();
+  const cat = LETTER_CATEGORIES.includes(ui.letterCat) ? ui.letterCat : LETTER_CATEGORIES[0];
+  const list = LANG.letters.filter((l) => l.category === cat);
+  const intro = {
+    子音: '子音は「名前（例の単語）」で覚えます。中子音・高子音・低子音の3つの類があり、声調の決まり方が変わります。',
+    母音: '母音は子音（ここでは無音の อ）の前・後・上・下に書きます。前に書く母音も、読むのは子音のあとです。',
+    声調記号: '声調記号は子音の右上に付けます。同じ記号でも、子音の類によって声調が変わります。',
+  }[cat];
+  return `
+  <section class="card">
+    <h1 class="title">タイ文字の一覧</h1>
+    <div class="tabs">${LETTER_CATEGORIES.map((c) => `<button class="${c === cat ? 'on' : ''}" data-action="letter-cat" data-value="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <p class="muted small">${esc(intro)} 文字を押すと名前を読み上げます。</p>
+    <ul class="letter-grid">
+      ${list.map((l) => {
+        const st = itemStatus(u.states, l);
+        return `<li>
+          <button class="letter-card ${st}" data-action="play" data-id="${l.id}" aria-label="${esc(l.roman)}を読み上げ">
+            <span class="letter-big" lang="th">${esc(l.es)}</span>
+            <span class="letter-roman">${esc(l.roman)}</span>
+            <span class="letter-ja">${esc(l.ja.replace(/^[^（]*/, ''))}</span>
+            <span class="letter-cls">${esc(l.pos)}</span>
+          </button>
+        </li>`;
+      }).join('')}
+    </ul>
+    <button class="btn primary wide" data-action="letter-quiz" data-value="${esc(cat)}">「${esc(cat)}」をクイズで確認</button>
+  </section>`;
+}
+
 // ---------- 設定 ----------
 function reviewSchedule(states) {
   const t = todayKey();
@@ -806,7 +847,7 @@ function showA2HS() {
 const SCREENS = {
   users: screenUsers, home: screenHome, setup: screenSetup, quiz: screenQuiz, result: screenResult,
   list: screenList, phrases: screenPhrases, settings: screenSettings,
-  passcode: screenPasscode,
+  passcode: screenPasscode, letters: screenLetters,
 };
 
 function render() {
@@ -885,6 +926,10 @@ const actions = {
   'phrase-quiz': () => {
     startSession({ ...homeCfg(), kind: 'phrase', scope: ui.phraseCat, target: 'all' }, 'normal');
   },
+  // その種類（子音・母音・声調記号）の文字だけのクイズ。設定は変えない
+  'letter-quiz': (el) => {
+    startSession({ ...homeCfg(), kind: 'letter', scope: el.dataset.value, target: 'all' }, 'normal');
+  },
   'retry-missed': () => {
     const r = ui.result;
     const missed = [...new Set(r.session.log.filter((l) => !l.retry && l.result !== 'correct').map((l) => l.id))];
@@ -903,7 +948,7 @@ const actions = {
   'play-q': () => playQuestion(),
   play: (el) => {
     const it = getItem(el.dataset.id);
-    say(it.es, it.lang).catch(() => toast(`音声を再生できませんでした。マナーモードや音量、${langOf(it).name}の声があるかを確認してください。`, 5000));
+    say(sayText(it), it.lang).catch(() => toast(`音声を再生できませんでした。マナーモードや音量、${langOf(it).name}の声があるかを確認してください。`, 5000));
   },
   'test-voice': () => {
     (LANG.code === 'th' ? say('สวัสดีครับ', 'th') : say('¡Hola! ¿Cómo estás?', 'es')).catch(() => toast('音声を再生できませんでした。', 4000));
@@ -1001,6 +1046,7 @@ const actions = {
     render();
   },
   'phrase-cat': (el) => { ui.phraseCat = el.dataset.value; render(); },
+  'letter-cat': (el) => { ui.letterCat = el.dataset.value; render(); },
   'sync-now': () => store.syncNow().then(() => toast('保存しました')).catch((e) => toast(`保存できませんでした：${e.message}`, 5000)),
   export: () => {
     const blob = new Blob([store.exportData()], { type: 'application/json' });

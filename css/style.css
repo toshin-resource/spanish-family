@@ -277,3 +277,34 @@ details summary { cursor: pointer; margin-top: 10px; font-weight: 600; color: va
   .big-number { font-size: 4.2rem; }
   .grid2 { grid-template-columns: 1fr; }
 }
+
+/* ---- タイ文字 ---- */
+.prompt-es.letter { font-size: 4.2rem; line-height: 1.1; font-weight: 600; }
+.letter-grid { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.letter-card {
+  width: 100%; min-height: 128px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 8px 4px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; cursor: pointer; text-align: center;
+}
+.letter-card.mastered { border-color: var(--ok); background: var(--ok-soft); }
+.letter-card.learning { border-color: var(--sun); }
+.letter-big { font-size: 2.4rem; line-height: 1.1; color: var(--ink); }
+.letter-roman { font-size: 0.82rem; font-weight: 700; color: var(--celeste-deep); }
+.letter-ja { font-size: 0.72rem; color: var(--muted); line-height: 1.3; }
+.letter-cls { font-size: 0.68rem; font-weight: 700; color: var(--pending); }
+
+/* ---- 回答後の結果：正解・不正解がひと目でわかるように ---- */
+.feedback { padding: 0 0 10px; overflow: hidden; gap: 6px; }
+.feedback > *:not(.verdict-banner) { margin-left: 12px; margin-right: 12px; }
+.verdict-banner { font-size: 1.35rem; font-weight: 800; text-align: center; padding: 8px 12px; color: #fff; }
+.feedback.ok .verdict-banner { background: var(--ok); }
+.feedback.ng .verdict-banner { background: var(--ng); }
+.feedback.unknown .verdict-banner { background: var(--celeste-deep); }
+.feedback.pending .verdict-banner { background: var(--pending); }
+.fb-row { display: flex; align-items: center; gap: 10px; }
+.fb-label { flex: none; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: #fff; border: 1.5px solid currentColor; }
+.fb-row.right .fb-label { color: var(--ok); }
+.fb-row.mine .fb-label { color: var(--ng); }
+.fb-value { flex: 1; min-width: 0; font-size: 1.25rem; font-weight: 800; line-height: 1.3; word-break: break-word; }
+.fb-row.mine .fb-value { font-size: 1rem; }
+.fb-sub { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.choice-mark { display: block; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.05em; }
