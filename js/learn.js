@@ -33,8 +33,6 @@ export const RULES = {
   retryAfterSets: 2, // 「今日の○問」で間違えた語を、何セット後に出し直すか（2 = 次の次のセット）
   masteryStreak: 3, // 習得済みとする連続正解数（1回の学習につき1回まで数える）
   intervalsDays: [1, 3, 7, 14, 30, 60, 120], // 正解が続いたときの次回復習までの日数
-  requeueGap: 3, // 「わからない」・不正解の後、何問挟んで再出題するか
-  maxRetriesPerItem: 2, // 1回の学習で同じ問題を再出題する上限（無限ループ防止）
 };
 
 export { PHRASE_CATEGORIES, LETTER_CATEGORIES };

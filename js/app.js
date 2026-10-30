@@ -307,6 +307,13 @@ function screenSetup() {
 // ---------- 学習の開始・再開 ----------
 // 「今日の○問」のセット番号（言語ごと）。間違えた語を「次の次のセット」で出し直すのに使う
 const nextSetNo = (s = settings(), lang = LANG.code) => ((s.setNos || {})[lang] || 0) + 1;
+// 間違えた語を出し直すセット番号。「今日の○問」中ならそのセットの次の次、それ以外の学習なら次の次の「今日の○問」
+function retrySetNo(entry) {
+  const sn = me().session;
+  if (sn?.type === 'today' && sn.cfg.setNo) return sn.cfg.setNo + RULES.retryAfterSets;
+  const lang = getItem(entry.id)?.lang || LANG.code;
+  return nextSetNo(settings(), lang) - 1 + RULES.retryAfterSets;
+}
 
 function startSession(cfg, type) {
   const u = me();
@@ -368,6 +375,8 @@ function finishSession() {
 function currentEntry() {
   const sn = me()?.session;
   if (!sn) return null;
+  // 以前の版でセットの途中に入れた「もう一度」の問題は出さない（間違えた語は次の次のセットで出す）
+  while (sn.queue[sn.pos]?.retry) sn.queue.splice(sn.pos, 1);
   return sn.queue[sn.pos] || null;
 }
 
@@ -594,8 +603,8 @@ function commitAnswer(result, { judgedBy = 'auto', speak = true } = {}) {
   const first = !sn.firstDone[key];
   const today = todayKey();
   const state = applyResult(u.states[key], result, { sessionId: sn.id, firstInSession: first, today });
-  // 「今日の○問」で間違えた・わからなかった語は、次の次のセットで出し直す
-  if (result !== 'correct' && sn.type === 'today' && sn.cfg.setNo) state.retryAtSet = sn.cfg.setNo + RULES.retryAfterSets;
+  // 間違えた・わからなかった語は、同じセットでは出し直さず、次の次の「今日の○問」で出す
+  if (result !== 'correct') state.retryAtSet = retrySetNo(entry);
   const answer = {
     answer_id: store.uid(),
     user_id: u.profile.user_id,
@@ -613,17 +622,9 @@ function commitAnswer(result, { judgedBy = 'auto', speak = true } = {}) {
   };
   // セットの進み具合を更新
   sn.firstDone[key] = true;
-  if (!entry.retry) sn.answeredCount++;
+  sn.answeredCount++;
   sn.log.push({ id: item.id, kind: item.kind, dir: entry.dir, result, retry: !!entry.retry });
   sn.pos++;
-  if (result !== 'correct') {
-    const n = sn.retries[key] || 0;
-    if (n < RULES.maxRetriesPerItem) {
-      sn.retries[key] = n + 1;
-      const at = Math.min(sn.pos + RULES.requeueGap, sn.queue.length);
-      sn.queue.splice(at, 0, { ...entry, retry: true });
-    }
-  }
   store.recordAnswer(u.profile.user_id, answer, key, state);
   store.saveSession(u.profile.user_id, sn);
   sp.stopListening();
@@ -830,7 +831,7 @@ function screenSettings() {
       <dt>1週間以内</dt><dd>${sched.buckets.week}件</dd>
       <dt>それ以降</dt><dd>${sched.buckets.later}件</dd>
     </dl>
-    <p class="muted small">正解が続くと間隔が ${RULES.intervalsDays.join('・')} 日と延び、間違えると翌日に戻ります。<b>別々の学習回で${RULES.masteryStreak}回続けて正解</b>すると「習得済み」になります（同じ学習回の中での再出題の正解は数えません）。</p>
+    <p class="muted small">正解が続くと間隔が ${RULES.intervalsDays.join('・')} 日と延び、間違えると翌日に戻ります。<b>別々の学習回で${RULES.masteryStreak}回続けて正解</b>すると「習得済み」になります。間違えた語は、次の次の「今日の○問」で出し直します。</p>
     ${sched.upcoming.length ? `<details><summary>次の復習予定（近い順）</summary><ul class="sched-list">${sched.upcoming.map((x) => {
       const [kind, id, dir, mode] = x.key.split(':');
       const it = getItem(id);
@@ -1149,19 +1150,14 @@ const actions = {
     if (!q || !q.done || q.rated) return;
     q.rated = true;
     if (el.dataset.value === 'notyet' && q.result === 'correct') {
-      // 当てずっぽうで正解したときなど：習得には数えず、翌日の復習と、この学習の中での再出題に回す
+      // 当てずっぽうで正解したときなど：習得には数えず、次の次の「今日の○問」で出し直す
       const u = me();
       const sn = u.session;
       const { entry } = q;
       const key = stateKey(entry.kind, entry.id, entry.dir, entry.mode);
       const notYet = applyNotYet(u.states[key]);
-      if (sn.type === 'today' && sn.cfg.setNo) notYet.retryAtSet = sn.cfg.setNo + RULES.retryAfterSets;
+      notYet.retryAtSet = retrySetNo(entry);
       store.updateState(u.profile.user_id, key, notYet);
-      const n = sn.retries[key] || 0;
-      if (n < RULES.maxRetriesPerItem) {
-        sn.retries[key] = n + 1;
-        sn.queue.splice(Math.min(sn.pos + RULES.requeueGap, sn.queue.length), 0, { ...entry, retry: true });
-      }
       const last = sn.log[sn.log.length - 1];
       if (last && last.id === entry.id) last.notYet = true;
       store.saveSession(u.profile.user_id, sn);
