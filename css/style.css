@@ -342,3 +342,6 @@ body[data-screen="quiz"] { padding-bottom: calc(124px + env(safe-area-inset-bott
 .update-banner { position: sticky; top: calc(60px + env(safe-area-inset-top, 0px)); z-index: 9; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 16px; background: var(--pending-soft); color: var(--pending); font-weight: 700; font-size: 0.92rem; box-shadow: 0 1px 0 var(--line); }
 .update-banner[hidden] { display: none; }
 .update-banner .btn { margin: 0; min-height: 38px; }
+/* 例文の🔊は右側に置く */
+.example .ex-body { flex: 1; }
+.example .ex-say { order: 2; align-self: center; }
