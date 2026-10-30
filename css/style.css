@@ -319,3 +319,26 @@ details summary { cursor: pointer; margin-top: 10px; font-weight: 600; color: va
 .action-inner .btn { min-height: 88px; font-size: 1.15rem; border-radius: 18px; white-space: nowrap; padding: 10px 8px; }
 .action-inner .btn:not(.primary):not(.ok) { border-width: 2px; border-color: var(--celeste); color: var(--celeste-deep); }
 body[data-screen="quiz"] { padding-bottom: calc(124px + env(safe-area-inset-bottom)); }
+
+/* ---- 例文 ---- */
+.example { display: flex; gap: 10px; align-items: flex-start; background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.example .ex-say { width: 40px; height: 40px; font-size: 1rem; flex: none; border-color: var(--celeste); }
+.ex-body { min-width: 0; }
+.ex-label { display: inline-block; font-size: 0.7rem; font-weight: 800; color: var(--celeste-deep); margin-bottom: 2px; }
+.ex-text { font-size: 1.05rem; font-weight: 700; line-height: 1.35; word-break: break-word; }
+.ex-roman { font-size: 0.82rem; color: var(--celeste-deep); }
+.ex-ja { font-size: 0.85rem; color: var(--muted); }
+.example.compact { margin-top: 6px; padding: 6px 8px; border-width: 1px; }
+.example.compact .ex-say { width: 34px; height: 34px; font-size: 0.85rem; }
+.example.compact .ex-text { font-size: 0.92rem; }
+
+/* ---- 答えるまでの残り時間 ---- */
+.countdown { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.cd-track { flex: 1; height: 10px; border-radius: 99px; background: var(--celeste-soft); overflow: hidden; }
+.cd-bar { height: 100%; width: 100%; background: linear-gradient(90deg, var(--sun), #ffd65a); border-radius: 99px; transition: width 0.1s linear; }
+#cd-text { flex: none; font-size: 0.9rem; font-weight: 800; color: var(--pending); min-width: 4.5em; text-align: right; }
+
+/* ---- 新しいバージョンのお知らせ ---- */
+.update-banner { position: sticky; top: calc(60px + env(safe-area-inset-top, 0px)); z-index: 9; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 16px; background: var(--pending-soft); color: var(--pending); font-weight: 700; font-size: 0.92rem; box-shadow: 0 1px 0 var(--line); }
+.update-banner[hidden] { display: none; }
+.update-banner .btn { margin: 0; min-height: 38px; }

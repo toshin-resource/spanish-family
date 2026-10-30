@@ -13,20 +13,22 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=20261030n">
+  <link rel="stylesheet" href="css/style.css?v=20261030o">
   <!-- 更新したら v= の値を変える。古いファイルと新しいファイルが混ざって動かなくなるのを防ぐ -->
   <script type="importmap">
   {
     "imports": {
-      "./js/app.js": "./js/app.js?v=20261030n",
-      "./js/store.js": "./js/store.js?v=20261030n",
-      "./js/learn.js": "./js/learn.js?v=20261030n",
-      "./js/speech.js": "./js/speech.js?v=20261030n",
-      "./js/ipa.js": "./js/ipa.js?v=20261030n",
-      "./js/data-words.js": "./js/data-words.js?v=20261030n",
-      "./js/data-phrases.js": "./js/data-phrases.js?v=20261030n",
-      "./js/data-thai.js": "./js/data-thai.js?v=20261030n",
-      "./config.js": "./config.js?v=20261030n"
+      "./js/app.js": "./js/app.js?v=20261030o",
+      "./js/store.js": "./js/store.js?v=20261030o",
+      "./js/learn.js": "./js/learn.js?v=20261030o",
+      "./js/speech.js": "./js/speech.js?v=20261030o",
+      "./js/ipa.js": "./js/ipa.js?v=20261030o",
+      "./js/data-words.js": "./js/data-words.js?v=20261030o",
+      "./js/data-phrases.js": "./js/data-phrases.js?v=20261030o",
+      "./js/data-thai.js": "./js/data-thai.js?v=20261030o",
+      "./js/examples-es.js": "./js/examples-es.js?v=20261030o",
+      "./js/examples-th.js": "./js/examples-th.js?v=20261030o",
+      "./config.js": "./config.js?v=20261030o"
     }
   }
   </script>
@@ -39,10 +41,11 @@
       <div id="save-status" class="save-status" aria-live="polite"></div>
     </div>
   </header>
+  <div id="update-banner" class="update-banner" hidden></div>
   <main id="main" class="wrap"></main>
   <div id="modal" class="modal" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <noscript><p class="wrap">このアプリを使うには JavaScript を有効にしてください。</p></noscript>
-  <script type="module" src="js/app.js?v=20261030n"></script>
+  <script type="module" src="js/app.js?v=20261030o"></script>
 </body>
 </html>

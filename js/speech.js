@@ -59,43 +59,54 @@ export function speakText(text) {
 
 let current = null;
 export function stopSpeaking() {
+  speakSeq++;
   if (synth) synth.cancel();
   current = null;
 }
 
-// 読み上げ。成功で resolve、失敗（声がない・再生できない）で reject
-// repeat：同じ言葉を続けて読む回数。まとめて読み上げの順番待ちに入れるので、1回目の終わりを待たずに2回目が続く
-export function speak(text, { rate = 0.9, voiceURI = '', lang = 'es', repeat = 1 } = {}) {
+// 1回分の読み上げ。読み終わったら resolve、失敗（声がない・再生できない）で reject
+function speakOnce(text, { rate, voiceURI, lang }) {
   return new Promise((resolve, reject) => {
-    if (!ttsSupported()) return reject(new Error('unsupported'));
-    stopListening();
     synth.cancel();
+    const u = new SpeechSynthesisUtterance(speakText(text));
     const v = pickVoice(lang, voiceURI);
+    if (v) u.voice = v;
+    u.lang = v ? v.lang : BCP47[lang] || 'es-ES';
+    u.rate = rate;
     let started = false;
     let finished = false;
-    const done = (fn) => { if (!finished) { finished = true; clearTimeout(timer); fn(); } };
+    const done = (fn) => { if (!finished) { finished = true; clearTimeout(timer); clearTimeout(guard); fn(); } };
     const timer = setTimeout(() => {
-      if (!started) {
-        synth.cancel();
-        done(() => reject(new Error('timeout')));
-      }
+      if (!started) { synth.cancel(); done(() => reject(new Error('timeout'))); }
     }, 4000);
-    const list = Array.from({ length: Math.max(1, repeat) }, (_, i) => {
-      const u = new SpeechSynthesisUtterance(speakText(text));
-      if (v) u.voice = v;
-      u.lang = v ? v.lang : BCP47[lang] || 'es-ES';
-      u.rate = rate;
-      u.onstart = () => { started = true; };
-      u.onerror = (e) => {
-        if (e.error === 'interrupted' || e.error === 'canceled') done(resolve);
-        else done(() => reject(new Error(e.error || 'error')));
-      };
-      if (i === repeat - 1 || repeat <= 1) u.onend = () => done(resolve);
-      return u;
-    });
-    current = list[list.length - 1];
-    for (const u of list) synth.speak(u);
+    // iPhoneで「読み終わり」の合図が来ないことがあるため、文の長さから見積もった時間がたったら終わりとみなす
+    const guard = setTimeout(() => done(resolve), 2500 + (speakText(text).length * 160) / rate);
+    u.onstart = () => { started = true; };
+    u.onend = () => done(resolve);
+    u.onerror = (e) => {
+      if (e.error === 'interrupted' || e.error === 'canceled') done(resolve);
+      else done(() => reject(new Error(e.error || 'error')));
+    };
+    current = u;
+    synth.speak(u);
   });
+}
+
+// 読み上げ。repeat：同じ言葉を読む回数。gap：2回目までの間（ミリ秒）
+// 別の読み上げが始まったら（stopSpeaking や次の speak）、残りの回は読まない
+let speakSeq = 0;
+export function speak(text, { rate = 0.9, voiceURI = '', lang = 'es', repeat = 1, gap = 800 } = {}) {
+  if (!ttsSupported()) return Promise.reject(new Error('unsupported'));
+  stopListening();
+  const seq = ++speakSeq;
+  const opts = { rate, voiceURI, lang };
+  let chain = speakOnce(text, opts);
+  for (let i = 1; i < repeat; i++) {
+    chain = chain
+      .then(() => new Promise((ok) => setTimeout(ok, gap)))
+      .then(() => (seq === speakSeq ? speakOnce(text, opts) : undefined));
+  }
+  return chain;
 }
 
 export function speaking() {

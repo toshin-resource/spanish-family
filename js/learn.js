@@ -2,6 +2,12 @@
 import { WORDS as ES_WORDS, WORD_STAGES as ES_STAGES } from './data-words.js';
 import { PHRASES as ES_PHRASES, PHRASE_CATEGORIES } from './data-phrases.js';
 import { THAI_WORDS, THAI_PHRASES, THAI_WORD_STAGES, THAI_LETTERS, LETTER_CATEGORIES } from './data-thai.js';
+import { EXAMPLES_ES } from './examples-es.js';
+import { EXAMPLES_TH } from './examples-th.js';
+
+// 単語に例文を付ける（{ text, roman?, ja }）
+for (const w of ES_WORDS) w.example = EXAMPLES_ES[w.id] || null;
+for (const w of THAI_WORDS) w.example = EXAMPLES_TH[w.id] || null;
 
 // 学習できる言語。項目（単語・フレーズ）の id は言語ごとに別なので、学習記録が混ざらない
 export const LANGS = {

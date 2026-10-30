@@ -50,6 +50,21 @@ function ipaLine(item, { withIpa = true } = {}) {
   return ipa || pos ? `<div class="sub">${ipa}${pos}</div>` : '';
 }
 
+// 例文：文・読み（タイ語）・日本語訳と、読み上げボタン
+function exampleBlock(item, { compact = false } = {}) {
+  const ex = item.example;
+  if (!ex) return '';
+  return `<div class="example${compact ? ' compact' : ''}">
+    <button class="icon-btn ex-say" data-action="play-ex" data-id="${esc(item.id)}" aria-label="例文を聞く">🔊</button>
+    <div class="ex-body">
+      ${compact ? '' : '<span class="ex-label">例文</span>'}
+      <div class="ex-text" lang="${esc(item.lang)}">${esc(ex.text)}</div>
+      ${ex.roman ? `<div class="ex-roman">${esc(ex.roman)}</div>` : ''}
+      <div class="ex-ja">${esc(ex.ja)}</div>
+    </div>
+  </div>`;
+}
+
 function toast(msg, ms = 3200) {
   $toast.textContent = msg;
   $toast.classList.add('show');
@@ -218,6 +233,7 @@ function screenHome() {
       <span class="chip">聞き取り ${sum.masteredWordsListen}語</span>
       <span class="chip">フレーズ ${sum.masteredPhrases} / ${sum.totalPhrases}</span>
       ${sum.totalLetters ? `<span class="chip">文字 ${sum.masteredLetters} / ${sum.totalLetters}</span>` : ''}
+      <span class="chip">⏱ 学習時間 合計${fmtDuration(s.studyTotalMs)}（今日${fmtDuration(s.studyDay && s.studyDay.date === todayKey() ? s.studyDay.ms : 0)}）</span>
     </div>
   </section>
 
@@ -395,7 +411,7 @@ function autoPlayIfListening() {
   const still = () => ui.q === q && ui.screen === 'quiz' && !q.answered && !q.audioError;
   // 2回続けて読み上げる（2回分をまとめて読み上げの順番待ちに入れる）
   const twice = () => playQuestion(2);
-  if (q.entry.mode === 'listen') { twice(); return; }
+  if (q.entry.mode === 'listen') { twice().finally(() => { q.audioDone = true; ensureCountdown(); }); return; }
   if (q.entry.dir !== 'es-ja' || q.item.kind === 'letter' || settings().autoSpeakQuestion === 'off') return;
   setTimeout(() => { if (still()) twice(); }, 1000);
 }
@@ -499,7 +515,9 @@ function screenQuiz() {
     </div>
     <div class="prompt">${prompt}</div>
     ${answerArea}
-    ${!revealed ? '<button class="btn ghost wide" data-action="dont-know">わからない</button>' : ''}
+    ${!revealed ? (answerSeconds() > 0
+      ? `<div class="countdown"><div class="cd-track"><div class="cd-bar" id="cd-bar"></div></div><span id="cd-text">${listen && !q.audioDone ? '音声のあとで数えます' : `あと${answerSeconds()}秒`}</span></div>`
+      : '<button class="btn ghost wide" data-action="dont-know">わからない</button>') : ''}
     ${revealed ? feedback(q) : ''}
   </section>
   ${revealed ? actionBar(q) : ''}`;
@@ -519,7 +537,7 @@ function feedback(q) {
   const { item, entry } = q;
   const others = item.kind === 'letter' ? [] : item.accepted.slice(1).filter((a) => a !== item.ja);
   const kind = q.pending ? 'pending' : q.result === 'correct' ? 'ok' : q.result === 'unknown' ? 'unknown' : 'ng';
-  const banner = { ok: '⭕ 正解！', ng: '❌ 不正解', unknown: '💡 答えを確認しましょう', pending: '❓ 確認待ち' }[kind];
+  const banner = { ok: '⭕ 正解！', ng: '❌ 不正解', unknown: q.timedOut ? '⏰ 時間切れ' : '💡 答えを確認しましょう', pending: '❓ 確認待ち' }[kind];
   // 正しい答え：その問題で選ぶ側の表記（外国語→日本語なら日本語、日本語→外国語なら外国語）
   const rightLabel = entry.dir === 'es-ja' ? item.ja : item.es;
   const rightSub = entry.dir === 'es-ja' ? '' : `<span class="fb-sub">${esc(item.ja)}</span>`;
@@ -545,6 +563,7 @@ function feedback(q) {
     ${others.length ? `<div class="small muted">ほかの正解：${others.map(esc).join('、')}</div>` : ''}
     ${item.hint ? `<div class="small hint">💡 ${esc(item.hint)}</div>` : ''}
     ${item.note ? `<div class="small hint">💬 ${esc(item.note)}</div>` : ''}
+    ${exampleBlock(item)}
   </div>`;
 }
 
@@ -673,7 +692,7 @@ function screenList() {
       ${rows.map(({ w, st }) => `
         <li>
           <button class="icon-btn" data-action="play" data-id="${w.id}" aria-label="発音">🔊</button>
-          <div class="wl-main"><div class="es">${esWithArticle(w)}</div>${ipaLine(w)}<div class="ja">${esc(w.ja)}</div></div>
+          <div class="wl-main"><div class="es">${esWithArticle(w)}</div>${ipaLine(w)}<div class="ja">${esc(w.ja)}</div>${exampleBlock(w, { compact: true })}</div>
           <div class="wl-side"><span class="badge ${st}">${STATUS_LABEL[st]}</span>
             <span class="mini">${ja(w) ? `日→${LANG.short}✓` : ''} ${li(w) ? '聞✓' : ''}</span></div>
         </li>`).join('')}
@@ -772,6 +791,8 @@ function screenSettings() {
     ${seg('choices', String(s.choices), [['4', '4択'], ['5', '5択']])}
     <label class="field-label">発音の速さ</label>
     ${seg('rate', String(s.rate), [['0.6', 'ゆっくり'], ['0.9', 'ふつう'], ['1.1', '速め']])}
+    <label class="field-label">答えるまでの時間（過ぎたら答えを表示）</label>
+    ${seg('answerSeconds', String(answerSeconds()), [['3', '3秒'], ['5', '5秒'], ['10', '10秒'], ['15', '15秒'], ['0', 'なし']])}
     <label class="field-label">問題を表示して1秒後に発音を読み上げる（2回）</label>
     ${seg('autoSpeakQuestion', s.autoSpeakQuestion, [['on', 'する'], ['off', 'しない']])}
     <label class="field-label">回答したら発音を読み上げる</label>
@@ -840,6 +861,8 @@ function screenSettings() {
   <section class="card">
     <h2>その他</h2>
     <button class="btn" data-action="a2hs">ホーム画面に追加する方法</button>
+    <button class="btn" data-action="update-app">アプリを更新（最新版を読み込む）</button>
+    <p class="muted small">いまの版：${esc(APP_VERSION || '—')}</p>
     <button class="btn" data-action="export">記録を書き出す（バックアップ）</button>
     <p class="muted small">単語 ${WORDS.length}語・フレーズ ${PHRASES.length}件を収録。単語の選定は仮のもので、日常会話でよく使う基本語を前に並べています。</p>
   </section>`;
@@ -868,6 +891,108 @@ function showA2HS() {
   $modal.hidden = false;
 }
 
+// ---------- 回答の制限時間（「わからない」ボタンの代わり） ----------
+// 決めた秒数のあいだに答えなければ、答えを表示する（わからない扱い）。秒数は設定で変えられる（0 = なし）
+const countdown = { q: null, deadline: 0, total: 0, timer: null };
+function answerSeconds() {
+  const n = Number(settings().answerSeconds);
+  return Number.isFinite(n) ? n : 5;
+}
+function stopCountdown() {
+  clearInterval(countdown.timer);
+  countdown.timer = null;
+  countdown.q = null;
+}
+// 入力中は、文字を打つたびに数え直す
+function restartCountdown(q) {
+  if (countdown.q === q) countdown.deadline = Date.now() + countdown.total;
+}
+function ensureCountdown() {
+  const q = ui.screen === 'quiz' ? ui.q : null;
+  if (!q || q.answered || q.pending || q.listeningNow || answerSeconds() <= 0) { stopCountdown(); return; }
+  if (q.entry.mode === 'listen' && !q.audioDone) return; // 聞き取りは音声を聞き終わってから数える
+  if (countdown.q === q && countdown.timer) { tickCountdown(); return; }
+  stopCountdown();
+  countdown.q = q;
+  countdown.total = answerSeconds() * 1000;
+  countdown.deadline = Date.now() + countdown.total;
+  countdown.timer = setInterval(tickCountdown, 100);
+  tickCountdown();
+}
+function tickCountdown() {
+  const q = countdown.q;
+  if (!q || ui.q !== q || ui.screen !== 'quiz' || q.answered || q.pending) { stopCountdown(); return; }
+  const left = countdown.deadline - Date.now();
+  const bar = document.getElementById('cd-bar');
+  const text = document.getElementById('cd-text');
+  if (bar) bar.style.width = `${Math.max(0, (left / countdown.total) * 100)}%`;
+  if (text) text.textContent = `あと${Math.max(0, Math.ceil(left / 1000))}秒`;
+  if (left <= 0) {
+    stopCountdown();
+    q.timedOut = true;
+    commitAnswer('unknown');
+  }
+}
+
+// ---------- 学習時間（問題の画面を開いている時間） ----------
+// 1分以上なにも操作がないあいだは数えない（画面を開いたまま置いておいた時間を含めない）
+const study = { start: 0, last: Date.now() };
+const STUDY_IDLE_MS = 60 * 1000;
+function studyActive() {
+  return ui.screen === 'quiz' && document.visibilityState === 'visible' && !!me();
+}
+function flushStudy() {
+  const now = Date.now();
+  if (study.start && me()) {
+    const ms = Math.max(0, Math.min(now, study.last + STUDY_IDLE_MS) - study.start);
+    if (ms >= 1000) {
+      const s = settings();
+      const today = todayKey();
+      const dayMs = s.studyDay && s.studyDay.date === today ? s.studyDay.ms : 0;
+      store.updateSettings(store.currentUid(), { studyTotalMs: (s.studyTotalMs || 0) + ms, studyDay: { date: today, ms: dayMs + ms } });
+    }
+  }
+  study.start = studyActive() ? now : 0;
+}
+function noteActivity() {
+  const now = Date.now();
+  if (study.start && now - study.last > STUDY_IDLE_MS) flushStudy(); // 休んでいた分は数えずに区切る
+  study.last = now;
+  if (!study.start && studyActive()) study.start = now;
+}
+['pointerdown', 'keydown', 'input'].forEach((ev) => document.addEventListener(ev, noteActivity, true));
+setInterval(flushStudy, 30 * 1000);
+function fmtDuration(ms) {
+  const min = Math.floor((ms || 0) / 60000);
+  if (min === 0 && ms > 0) return '1分未満';
+  return min >= 60 ? `${Math.floor(min / 60)}時間${min % 60}分` : `${min}分`;
+}
+
+// ---------- アプリの更新 ----------
+// いま動いている版（読み込んだ app.js の ?v=）と、公開中の index.html の版を比べ、新しければ「更新する」を出す
+const APP_VERSION = new URL(import.meta.url).searchParams.get('v') || '';
+const $update = document.getElementById('update-banner');
+async function checkForUpdate() {
+  if (!APP_VERSION || !navigator.onLine) return;
+  try {
+    const html = await (await fetch(`./index.html?check=${Date.now()}`, { cache: 'no-store' })).text();
+    const latest = (html.match(/js\/app\.js\?v=([\w.-]+)/) || [])[1];
+    if (latest && latest !== APP_VERSION) {
+      $update.innerHTML = `<span>新しいバージョンがあります</span><button class="btn small primary" data-action="update-app" data-v="${esc(latest)}">更新する</button>`;
+      $update.hidden = false;
+    }
+  } catch (e) { /* 通信できないときは次の機会に */ }
+}
+// 更新：ためていた記録を先に保存してから、最新の版を読み込み直す
+async function updateApp(v = String(Date.now())) {
+  flushStudy();
+  toast('更新しています…');
+  await store.syncNow().catch(() => {});
+  location.replace(`./?v=${encodeURIComponent(v)}`);
+}
+setTimeout(checkForUpdate, 3000);
+setInterval(checkForUpdate, 10 * 60 * 1000);
+
 // ---------- 描画 ----------
 const SCREENS = {
   users: screenUsers, home: screenHome, setup: screenSetup, quiz: screenQuiz, result: screenResult,
@@ -885,6 +1010,8 @@ function render() {
   document.body.dataset.screen = ui.screen;
   renderHeader();
   renderSave();
+  if (studyActive() !== !!study.start) flushStudy();
+  ensureCountdown();
 }
 
 // 画面上部の固定バー：ホーム以外の画面では、アプリ名の代わりに「ホームへ戻る」ボタンを出す
@@ -912,7 +1039,7 @@ const actions = {
       return render();
     }
     const patch = {};
-    patch[name] = ['setSize', 'choices'].includes(name) ? Number(value) : name === 'rate' ? Number(value) : value;
+    patch[name] = ['setSize', 'choices', 'answerSeconds'].includes(name) ? Number(value) : name === 'rate' ? Number(value) : value;
     store.updateSettings(store.currentUid(), patch);
     render();
   },
@@ -975,6 +1102,11 @@ const actions = {
   play: (el) => {
     const it = getItem(el.dataset.id);
     say(sayText(it), it.lang).catch(() => toast(`音声を再生できませんでした。マナーモードや音量、${langOf(it).name}の声があるかを確認してください。`, 5000));
+  },
+  'update-app': (el) => updateApp(el.dataset.v),
+  'play-ex': (el) => {
+    const it = getItem(el.dataset.id);
+    if (it?.example) say(it.example.text, it.lang).catch(() => toast('音声を再生できませんでした。', 4000));
   },
   'test-voice': () => {
     (LANG.code === 'th' ? say('สวัสดีครับ', 'th') : say('¡Hola! ¿Cómo estás?', 'es')).catch(() => toast('音声を再生できませんでした。', 4000));
@@ -1102,6 +1234,7 @@ $modal.addEventListener('click', (e) => { if (e.target === $modal) actions['clos
 document.addEventListener('input', (e) => {
   if (e.target.id === 'answer-input' && ui.q) {
     ui.q.text = e.target.value;
+    restartCountdown(ui.q);
   }
 });
 
@@ -1122,7 +1255,7 @@ document.addEventListener('submit', async (e) => {
     sp.stopListening();
     q.text = form.answer.value;
     const j = judgeInput(q.item, q.text);
-    if (j.result === 'empty') { toast('答えを入力するか、「わからない」を押してください。'); return; }
+    if (j.result === 'empty') { toast('答えを入力してください。'); return; }
     if (j.result === 'pending') { q.pending = true; q.answered = true; render(); answerSounds(q.item); return; }
     q.matched = j.matched || null;
     commitAnswer(j.result);
@@ -1185,7 +1318,9 @@ window.speechSynthesis?.addEventListener?.('voiceschanged', () => { if (ui.scree
 // 他の画面に移るときやアプリを閉じるときは音声入力を止める
 // アプリに戻ってきたときは、ほかの端末での学習分をクラウドから読み込み直す
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') { sp.stopListening(); return; }
+  flushStudy(); // 学習時間：アプリを閉じたら区切り、戻ったら数え直す
+  if (document.visibilityState === 'hidden') { sp.stopListening(); store.syncNow().catch(() => {}); return; }
+  checkForUpdate();
   if (store.remoteEnabled() && store.currentUid() && store.online()) {
     store.pullUser(store.currentUid()).then(() => { if (['home', 'list', 'phrases'].includes(ui.screen)) render(); }).catch(() => {});
   }
