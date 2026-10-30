@@ -32,9 +32,10 @@ export function spanishVoices() {
 const LANG_ORDER = {
   es: ['es-AR', 'es-419', 'es-US', 'es-MX', 'es-ES'],
   th: ['th-TH'],
+  en: ['en-US', 'en-GB', 'en-AU', 'en-CA', 'en-IE', 'en-NZ', 'en-ZA', 'en-IN'],
   ja: ['ja-JP'],
 };
-const BCP47 = { es: 'es-ES', th: 'th-TH', ja: 'ja-JP' };
+const BCP47 = { es: 'es-ES', th: 'th-TH', en: 'en-US', ja: 'ja-JP' };
 function pickVoice(lang, voiceURI) {
   const list = voicesFor(lang);
   if (voiceURI) {

@@ -45,7 +45,8 @@ function ipaLine(item, { withIpa = true } = {}) {
   const v = settings().ipa;
   let ipa = '';
   if (withIpa && item.roman) ipa = `<span class="ipa roman">${esc(item.roman)}</span>`; // タイ語は読み（声調記号つき）
-  else if (withIpa && v !== 'off') ipa = `<span class="ipa" lang="es-fonipa">${esc(toIpa(item.es, v))}</span>`;
+  else if (withIpa && item.ipa) { if (settings().enIpa !== 'off') ipa = `<span class="ipa" lang="en-fonipa">/${esc(item.ipa)}/</span>`; } // 英語（アメリカ発音）
+  else if (withIpa && v !== 'off' && item.lang === 'es') ipa = `<span class="ipa" lang="es-fonipa">${esc(toIpa(item.es, v))}</span>`;
   const pos = item.pos ? `<span class="pos">${esc(item.pos)}</span>` : '';
   return ipa || pos ? `<div class="sub">${ipa}${pos}</div>` : '';
 }
@@ -821,6 +822,14 @@ function screenSettings() {
       </select>`
       : `<p class="alert small">${sp.ttsSupported() ? 'スペイン語の音声が見つかりません。iPhoneの「設定」→「アクセシビリティ」→「読み上げコンテンツ」→「声」からスペイン語の声を追加すると使えるようになる場合があります。' : 'このブラウザは読み上げに対応していません。'}</p>`}
     <button class="btn" data-action="test-voice">試しに再生：¡Hola! ¿Cómo estás?</button>`
+    : LANG.code === 'en' ? `
+    <label class="field-label">発音記号（英語・アメリカ発音）</label>
+    ${seg('enIpa', s.enIpa, [['on', '表示する'], ['off', '表示しない']])}
+    <p class="muted small">日本語→英語の問題と聞き取り問題では、答えのヒントにならないよう回答後に表示します。</p>
+    <label class="field-label">読み上げの声（英語）</label>
+    ${sp.voicesFor('en').length ? '<p class="muted small">この端末の英語の声（アメリカ → イギリス → オーストラリアの順）を自動で使います。</p>'
+      : `<p class="alert small">${sp.ttsSupported() ? '英語の音声が見つかりません。iPhoneの「設定」→「アクセシビリティ」→「読み上げコンテンツ」→「声」から英語の声を追加すると使えるようになる場合があります。' : 'このブラウザは読み上げに対応していません。'}</p>`}
+    <button class="btn" data-action="test-voice">試しに再生：Hello! How are you?</button>`
     : `
     <p class="muted small">タイ語は、タイ文字の下に読み（ローマ字・声調記号つき）を表示します。記号なし＝平らに、à＝低く、â＝高から下げて、á＝高く、ǎ＝低から上げて発音します。aa・ii など同じ文字が2つ続くと長く伸ばします。</p>
     <label class="field-label">読み上げの声（タイ語）</label>
@@ -1276,7 +1285,8 @@ const actions = {
     if (it?.example) say(it.example.text, it.lang).catch(() => toast('音声を再生できませんでした。', 4000));
   },
   'test-voice': () => {
-    (LANG.code === 'th' ? say('สวัสดีครับ', 'th') : say('¡Hola! ¿Cómo estás?', 'es')).catch(() => toast('音声を再生できませんでした。', 4000));
+    const sample = { th: 'สวัสดีครับ', en: 'Hello! How are you?', es: '¡Hola! ¿Cómo estás?' };
+    say(sample[LANG.code] || sample.es, LANG.code).catch(() => toast('音声を再生できませんでした。', 4000));
   },
   choose: (el) => {
     const q = ui.q;

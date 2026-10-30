@@ -18,14 +18,14 @@ export const DEFAULT_SETTINGS = {
   choices: 4,
   rate: 0.9,
   voiceURI: '',
-  lang: 'es', // 学習する言語：es スペイン語 / th タイ語
+  lang: 'es', // 学習する言語：es スペイン語 / th タイ語 / en 英語
   wordScope: 'all', // 単語の範囲：all（すべてを順番に）/ 1・2 …（その段階だけ）
   letterScope: 'all', // タイ文字の範囲：all / 子音 / 母音 / 声調記号
   ipa: 'latam', // 発音記号：latam 中南米 / ar アルゼンチン / off 表示しない
   answerSeconds: 5, // 答えるまでの時間（秒）。過ぎたら答えを表示。0 = 制限なし（「わからない」ボタンを出す）
   autoSpeakQuestion: 'on', // 問題を表示して1秒後に読み上げる（外国語が表示される問題だけ）
   autoSpeak: 'on', // 回答したら発音を読み上げる
-  sfx: 'on', autoTarget: 'all', autoOrder: 'order', autoExample: 'show', // 正解のときに効果音を鳴らす
+  sfx: 'on', enIpa: 'on', autoTarget: 'all', autoOrder: 'order', autoExample: 'show', // 正解のときに効果音を鳴らす
 };
 
 function fresh() {
