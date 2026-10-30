@@ -64,32 +64,37 @@ export function stopSpeaking() {
 }
 
 // 読み上げ。成功で resolve、失敗（声がない・再生できない）で reject
-export function speak(text, { rate = 0.9, voiceURI = '', lang = 'es' } = {}) {
+// repeat：同じ言葉を続けて読む回数。まとめて読み上げの順番待ちに入れるので、1回目の終わりを待たずに2回目が続く
+export function speak(text, { rate = 0.9, voiceURI = '', lang = 'es', repeat = 1 } = {}) {
   return new Promise((resolve, reject) => {
     if (!ttsSupported()) return reject(new Error('unsupported'));
     stopListening();
     synth.cancel();
-    const u = new SpeechSynthesisUtterance(speakText(text));
     const v = pickVoice(lang, voiceURI);
-    if (v) u.voice = v;
-    u.lang = v ? v.lang : BCP47[lang] || 'es-ES';
-    u.rate = rate;
     let started = false;
+    let finished = false;
+    const done = (fn) => { if (!finished) { finished = true; clearTimeout(timer); fn(); } };
     const timer = setTimeout(() => {
       if (!started) {
         synth.cancel();
-        reject(new Error('timeout'));
+        done(() => reject(new Error('timeout')));
       }
     }, 4000);
-    u.onstart = () => { started = true; };
-    u.onend = () => { clearTimeout(timer); resolve(); };
-    u.onerror = (e) => {
-      clearTimeout(timer);
-      if (e.error === 'interrupted' || e.error === 'canceled') resolve();
-      else reject(new Error(e.error || 'error'));
-    };
-    current = u;
-    synth.speak(u);
+    const list = Array.from({ length: Math.max(1, repeat) }, (_, i) => {
+      const u = new SpeechSynthesisUtterance(speakText(text));
+      if (v) u.voice = v;
+      u.lang = v ? v.lang : BCP47[lang] || 'es-ES';
+      u.rate = rate;
+      u.onstart = () => { started = true; };
+      u.onerror = (e) => {
+        if (e.error === 'interrupted' || e.error === 'canceled') done(resolve);
+        else done(() => reject(new Error(e.error || 'error')));
+      };
+      if (i === repeat - 1 || repeat <= 1) u.onend = () => done(resolve);
+      return u;
+    });
+    current = list[list.length - 1];
+    for (const u of list) synth.speak(u);
   });
 }
 

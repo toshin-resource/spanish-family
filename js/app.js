@@ -59,7 +59,7 @@ function toast(msg, ms = 3200) {
 
 // 読み上げの共通処理（その言語の声がない端末では一度だけ案内する）
 const warnedVoice = {};
-function say(text, lang = LANG.code) {
+function say(text, lang = LANG.code, repeat = 1) {
   const s = settings();
   if (!warnedVoice[lang] && sp.missingVoice(lang)) {
     warnedVoice[lang] = true;
@@ -67,7 +67,7 @@ function say(text, lang = LANG.code) {
     toast(`この端末に${name}の声が見つかりません。発音が正しくない場合は、iPhoneの「設定」→「アクセシビリティ」→「読み上げコンテンツ」→「声」で${name}を追加してください。`, 7000);
   }
   // 声の選択はスペイン語だけ（タイ語は端末のタイ語の声を自動で使う）
-  return sp.speak(text, { rate: s.rate, voiceURI: lang === 'es' ? s.voiceURI : '', lang });
+  return sp.speak(text, { rate: s.rate, voiceURI: lang === 'es' ? s.voiceURI : '', lang, repeat });
 }
 
 function fmtDay(key) {
@@ -393,20 +393,18 @@ function autoPlayIfListening() {
   const q = ui.screen === 'quiz' ? prepareQuestion() : null;
   if (!q || q.answered) return;
   const still = () => ui.q === q && ui.screen === 'quiz' && !q.answered && !q.audioError;
-  // 2回続けて読み上げる（1回目が終わって少し間をあけてから2回目）
-  const twice = () => playQuestion()
-    .then(() => new Promise((ok) => setTimeout(ok, 700)))
-    .then(() => { if (still()) playQuestion(); });
+  // 2回続けて読み上げる（2回分をまとめて読み上げの順番待ちに入れる）
+  const twice = () => playQuestion(2);
   if (q.entry.mode === 'listen') { twice(); return; }
   if (q.entry.dir !== 'es-ja' || q.item.kind === 'letter' || settings().autoSpeakQuestion === 'off') return;
   setTimeout(() => { if (still()) twice(); }, 1000);
 }
 
-function playQuestion() {
+function playQuestion(repeat = 1) {
   const q = ui.q;
   if (!q) return Promise.resolve();
   q.audioError = false;
-  return say(sayText(q.item), q.item.lang)
+  return say(sayText(q.item), q.item.lang, repeat)
     .then(() => { if (ui.q === q && q.audioError) { q.audioError = false; render(); } })
     .catch(() => {
       if (ui.q !== q) return;
