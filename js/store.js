@@ -18,6 +18,8 @@ export const DEFAULT_SETTINGS = {
   choices: 4,
   rate: 0.9,
   voiceURI: '',
+  lang: 'es', // 学習する言語：es スペイン語 / th タイ語
+  wordScope: 'all', // 単語の範囲：all（すべてを順番に）/ 1・2 …（その段階だけ）
   ipa: 'latam', // 発音記号：latam 中南米 / ar アルゼンチン / off 表示しない
   autoSpeak: 'on', // 回答したら発音を読み上げる
   sfx: 'on', // 正解のときに効果音を鳴らす

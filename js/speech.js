@@ -2,12 +2,12 @@
 // どちらも Web Speech API。使える声・動作は端末とブラウザに依存する。
 
 const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
-let voices = [];
+let allVoices = [];
 
 function loadVoices() {
   if (!synth) return [];
-  voices = synth.getVoices().filter((v) => /^es([-_]|$)/i.test(v.lang));
-  return voices;
+  allVoices = synth.getVoices();
+  return allVoices;
 }
 if (synth) {
   loadVoices();
@@ -18,29 +18,39 @@ export function ttsSupported() {
   return !!synth && typeof SpeechSynthesisUtterance !== 'undefined';
 }
 
+// その言語（'es' / 'th'）の声の一覧
+export function voicesFor(lang) {
+  const list = allVoices.length ? allVoices : loadVoices();
+  const re = new RegExp(`^${lang}([-_]|$)`, 'i');
+  return list.filter((v) => re.test(v.lang));
+}
 export function spanishVoices() {
-  return voices.length ? voices : loadVoices();
+  return voicesFor('es');
 }
 
-// 地域の優先順：アルゼンチン → 中南米 → スペイン → その他
-const LANG_ORDER = ['es-AR', 'es-419', 'es-US', 'es-MX', 'es-ES'];
-function pickVoice(voiceURI) {
-  const list = spanishVoices();
+// 言語ごとの声の優先順（スペイン語はアルゼンチン → 中南米 → スペインの順）
+const LANG_ORDER = {
+  es: ['es-AR', 'es-419', 'es-US', 'es-MX', 'es-ES'],
+  th: ['th-TH'],
+};
+const BCP47 = { es: 'es-ES', th: 'th-TH' };
+function pickVoice(lang, voiceURI) {
+  const list = voicesFor(lang);
   if (voiceURI) {
     const v = list.find((x) => x.voiceURI === voiceURI);
     if (v) return v;
   }
-  for (const lang of LANG_ORDER) {
-    const v = list.find((x) => x.lang.replace('_', '-').toLowerCase() === lang.toLowerCase());
+  for (const code of LANG_ORDER[lang] || []) {
+    const v = list.find((x) => x.lang.replace('_', '-').toLowerCase() === code.toLowerCase());
     if (v) return v;
   }
   return list[0] || null;
 }
 
-// 声の一覧は読み込まれたが、スペイン語の声が1つもない状態か
-export function missingSpanishVoice() {
+// 声の一覧は読み込まれたが、その言語の声が1つもない状態か
+export function missingVoice(lang = 'es') {
   if (!synth) return false;
-  return synth.getVoices().length > 0 && spanishVoices().length === 0;
+  return synth.getVoices().length > 0 && voicesFor(lang).length === 0;
 }
 
 export function speakText(text) {
@@ -54,15 +64,15 @@ export function stopSpeaking() {
 }
 
 // 読み上げ。成功で resolve、失敗（声がない・再生できない）で reject
-export function speak(text, { rate = 0.9, voiceURI = '' } = {}) {
+export function speak(text, { rate = 0.9, voiceURI = '', lang = 'es' } = {}) {
   return new Promise((resolve, reject) => {
     if (!ttsSupported()) return reject(new Error('unsupported'));
     stopListening();
     synth.cancel();
     const u = new SpeechSynthesisUtterance(speakText(text));
-    const v = pickVoice(voiceURI);
+    const v = pickVoice(lang, voiceURI);
     if (v) u.voice = v;
-    u.lang = v ? v.lang : 'es-ES';
+    u.lang = v ? v.lang : BCP47[lang] || 'es-ES';
     u.rate = rate;
     let started = false;
     const timer = setTimeout(() => {

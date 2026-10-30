@@ -1,6 +1,26 @@
 // 学習ロジック：判定・選択肢・復習スケジュール・出題セット・集計
-import { WORDS, WORD_STAGES } from './data-words.js';
-import { PHRASES, PHRASE_CATEGORIES } from './data-phrases.js';
+import { WORDS as ES_WORDS, WORD_STAGES as ES_STAGES } from './data-words.js';
+import { PHRASES as ES_PHRASES, PHRASE_CATEGORIES } from './data-phrases.js';
+import { THAI_WORDS, THAI_PHRASES, THAI_WORD_STAGES } from './data-thai.js';
+
+// 学習できる言語。項目（単語・フレーズ）の id は言語ごとに別なので、学習記録が混ざらない
+export const LANGS = {
+  es: { code: 'es', name: 'スペイン語', short: '西', words: ES_WORDS, phrases: ES_PHRASES, stages: ES_STAGES },
+  th: { code: 'th', name: 'タイ語', short: 'タイ', words: THAI_WORDS, phrases: THAI_PHRASES, stages: THAI_WORD_STAGES },
+};
+
+// いま選んでいる言語。WORDS などは setLang で切り替わる（読み込んだ側にも最新の値が見える）
+export let LANG = LANGS.es;
+export let WORDS = ES_WORDS;
+export let PHRASES = ES_PHRASES;
+export let WORD_STAGES = ES_STAGES;
+export function setLang(code) {
+  LANG = LANGS[code] || LANGS.es;
+  WORDS = LANG.words;
+  PHRASES = LANG.phrases;
+  WORD_STAGES = LANG.stages;
+}
+export const langOf = (item) => LANGS[item?.lang] || LANG;
 
 // 変更しやすい初期値（仕様書で「暫定」とされている値）
 export const RULES = {
@@ -10,11 +30,15 @@ export const RULES = {
   maxRetriesPerItem: 2, // 1回の学習で同じ問題を再出題する上限（無限ループ防止）
 };
 
-export { WORDS, PHRASES, WORD_STAGES, PHRASE_CATEGORIES };
+export { PHRASE_CATEGORIES };
 
-const BY_ID = new Map([...WORDS, ...PHRASES].map((it) => [it.id, it]));
+const BY_ID = new Map(Object.values(LANGS).flatMap((l) => [...l.words, ...l.phrases]).map((it) => [it.id, it]));
 export const getItem = (id) => BY_ID.get(id);
-export const itemsOf = (kind) => (kind === 'phrase' ? PHRASES : WORDS);
+// lang を省略すると、いま選んでいる言語
+export const itemsOf = (kind, lang = LANG.code) => {
+  const l = LANGS[lang] || LANG;
+  return kind === 'phrase' ? l.phrases : l.words;
+};
 
 // ---------- 日付（日本時間） ----------
 const JST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -102,7 +126,7 @@ export function judgeInput(item, text) {
   }
 
   // 他の語の意味と一致し、この語の意味とは重ならない → 不正解（どの語の意味かを示す）
-  for (const other of itemsOf(item.kind)) {
+  for (const other of itemsOf(item.kind, item.lang)) {
     if (other.id === item.id || overlaps(item, other)) continue;
     const set = ANSWER_SETS.get(other.id);
     for (const v of answers) if (set.has(v)) return { result: 'wrong', matched: other };
@@ -128,7 +152,7 @@ export function labelFor(item, dir) {
 export function buildChoices(item, dir, count = 4) {
   const label = (it) => normalize(labelFor(it, dir));
   const used = new Set([label(item)]);
-  const pool = shuffle(itemsOf(item.kind)).filter((o) => {
+  const pool = shuffle(itemsOf(item.kind, item.lang)).filter((o) => {
     if (o.id === item.id) return false;
     if (item.similarGroup && o.similarGroup === item.similarGroup) return false;
     if (overlaps(item, o)) return false;
@@ -227,8 +251,8 @@ export function effectiveMode(cfg) {
   return { presentation, dir, answerMode };
 }
 
-export function scopeItems(kind, scope) {
-  const all = itemsOf(kind);
+export function scopeItems(kind, scope, lang) {
+  const all = itemsOf(kind, lang);
   if (!scope || scope === 'all') return all;
   if (kind === 'word') return all.filter((w) => String(w.stage) === String(scope));
   return all.filter((p) => p.category === scope);
@@ -242,7 +266,7 @@ function dirsFor(dir) {
 export function dueEntries(states, cfg, today = todayKey()) {
   const { presentation, dir } = effectiveMode(cfg);
   const out = [];
-  for (const item of scopeItems(cfg.kind, cfg.scope)) {
+  for (const item of scopeItems(cfg.kind, cfg.scope, cfg.lang)) {
     for (const d of dirsFor(dir)) {
       const st = states[stateKey(item.kind, item.id, d, presentation)];
       if (isDue(st, today)) out.push({ item, dir: d, next: st.next, status: st.status });
@@ -257,7 +281,7 @@ export function dueEntries(states, cfg, today = todayKey()) {
 export function buildQueue(states, cfg, { today = todayKey(), todaySet = false } = {}) {
   const { presentation, dir, answerMode } = effectiveMode(cfg);
   const count = Math.max(1, cfg.count || 10);
-  const items = scopeItems(cfg.kind, cfg.scope);
+  const items = scopeItems(cfg.kind, cfg.scope, cfg.lang);
   const st = (item, d) => states[stateKey(item.kind, item.id, d, presentation)];
   const pickDir = () => (dir === 'mix' ? (Math.random() < 0.5 ? 'es-ja' : 'ja-es') : dir);
   const chosen = [];
@@ -308,6 +332,7 @@ export function summarize(states, today = todayKey()) {
   let answers = 0;
   for (const [key, s] of Object.entries(states || {})) {
     const { kind, id, dir, mode } = parseKey(key);
+    if (getItem(id)?.lang !== LANG.code) continue; // いま選んでいる言語の記録だけを数える
     answers += (s.correct || 0) + (s.incorrect || 0) + (s.unknown || 0);
     if (s.lastDay && s.lastDay > lastDay) lastDay = s.lastDay;
     if (s.lastDay === today) (kind === 'word' ? sets.todayWords : sets.todayPhrases).add(id);

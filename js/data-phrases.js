@@ -107,6 +107,7 @@ export const PHRASES = RAW.trim().split('\n').map((line, i) => {
   const [id, es, ja, alts, category, note] = line.split('|');
   const group = SIMILAR_GROUPS.findIndex((g) => g.includes(id));
   return {
+    lang: 'es',
     similarGroup: group >= 0 ? `pg${group}` : '',
     kind: 'phrase',
     id,
