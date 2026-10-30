@@ -792,7 +792,10 @@ function screenSettings() {
     <label class="field-label">発音の速さ</label>
     ${seg('rate', String(s.rate), [['0.6', 'ゆっくり'], ['0.9', 'ふつう'], ['1.1', '速め']])}
     <label class="field-label">答えるまでの時間（過ぎたら答えを表示）</label>
-    ${seg('answerSeconds', String(answerSeconds()), [['3', '3秒'], ['5', '5秒'], ['10', '10秒'], ['15', '15秒'], ['0', 'なし']])}
+    <select class="sec-select" data-change="answerSeconds" aria-label="答えるまでの時間">
+      ${Array.from({ length: 28 }, (_, i) => i + 3).map((n) => `<option value="${n}" ${n === answerSeconds() ? 'selected' : ''}>${n}秒</option>`).join('')}
+      <option value="0" ${answerSeconds() === 0 ? 'selected' : ''}>なし（「わからない」ボタンを出す）</option>
+    </select>
     <label class="field-label">問題を表示して1秒後に発音を読み上げる（2回）</label>
     ${seg('autoSpeakQuestion', s.autoSpeakQuestion, [['on', 'する'], ['off', 'しない']])}
     <label class="field-label">回答したら発音を読み上げる</label>
@@ -1239,6 +1242,11 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', (e) => {
+  // 答えるまでの時間（iPhoneでは回転式のリールで選べる）
+  if (e.target.dataset.change === 'answerSeconds') {
+    store.updateSettings(store.currentUid(), { answerSeconds: Number(e.target.value) });
+    toast(Number(e.target.value) ? `答えるまでの時間を${e.target.value}秒にしました` : '時間の制限をなくしました');
+  }
   if (e.target.dataset.change === 'voice') {
     store.updateSettings(store.currentUid(), { voiceURI: e.target.value });
   }

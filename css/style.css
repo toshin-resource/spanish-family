@@ -345,3 +345,5 @@ body[data-screen="quiz"] { padding-bottom: calc(124px + env(safe-area-inset-bott
 /* 例文の🔊は右側に置く */
 .example .ex-body { flex: 1; }
 .example .ex-say { order: 2; align-self: center; }
+/* 秒数のリール選択 */
+.sec-select { font-size: 1.15rem; font-weight: 700; text-align: center; text-align-last: center; }
