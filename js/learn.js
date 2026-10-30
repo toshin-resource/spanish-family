@@ -24,6 +24,7 @@ export const langOf = (item) => LANGS[item?.lang] || LANG;
 
 // 変更しやすい初期値（仕様書で「暫定」とされている値）
 export const RULES = {
+  retryAfterSets: 2, // 「今日の○問」で間違えた語を、何セット後に出し直すか（2 = 次の次のセット）
   masteryStreak: 3, // 習得済みとする連続正解数（1回の学習につき1回まで数える）
   intervalsDays: [1, 3, 7, 14, 30, 60, 120], // 正解が続いたときの次回復習までの日数
   requeueGap: 3, // 「わからない」・不正解の後、何問挟んで再出題するか
@@ -177,6 +178,7 @@ export function buildChoices(item, dir, count = 4) {
 // ---------- 学習状態と復習スケジュール ----------
 export function newState() {
   return {
+    retryAtSet: 0, // 「今日の○問」の何セット目で出し直すか（0 = 予定なし）
     status: 'new', // new 未学習 / learning 学習中 / mastered 習得済み
     correct: 0,
     incorrect: 0,
@@ -199,6 +201,7 @@ export function applyResult(prev, result, { sessionId, firstInSession, today = t
   if (result === 'correct') {
     s.correct++;
     if (firstInSession) {
+      s.retryAtSet = 0; // 出し直しの予定は、正解したら解除
       s.streak++;
       if (s.lastStepDay !== today) {
         s.step = Math.min(s.step + 1, RULES.intervalsDays.length);
@@ -270,6 +273,11 @@ export function dueEntries(states, cfg, today = todayKey()) {
   for (const item of scopeItems(cfg.kind, cfg.scope, cfg.lang)) {
     for (const d of dirsFor(dir)) {
       const st = states[stateKey(item.kind, item.id, d, presentation)];
+      // 「今日の○問」で間違えた語：決めたセット番号になるまでは出さず、なったら一番先に出す
+      if (st?.retryAtSet && cfg.setNo) {
+        if (cfg.setNo >= st.retryAtSet) out.push({ item, dir: d, next: '0000-00-00', status: st.status });
+        continue;
+      }
       if (isDue(st, today)) out.push({ item, dir: d, next: st.next, status: st.status });
     }
   }

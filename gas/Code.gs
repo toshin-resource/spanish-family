@@ -15,7 +15,7 @@ var SHEETS = {
   users: ['user_id', 'display_name', 'created_at', 'settings_json', 'settings_updated_at', 'session_json',
     'session_updated_at', 'today_json', 'summary_json', 'updated_at'],
   progress: ['user_id', 'key', 'kind', 'item_id', 'direction', 'mode', 'status', 'correct', 'incorrect', 'unknown',
-    'streak', 'step', 'next_review', 'last_session', 'last_at', 'last_day', 'last_step_day', 'updated_at'],
+    'streak', 'step', 'next_review', 'last_session', 'last_at', 'last_day', 'last_step_day', 'updated_at', 'retry_at_set'],
   answers: ['answer_id', 'user_id', 'kind', 'item_id', 'direction', 'mode', 'session_id', 'answer_mode',
     'input_method', 'result', 'judged_by', 'answer_text', 'answered_at', 'received_at'],
 };
@@ -199,6 +199,7 @@ function getUserData(userId) {
       lastDay: String(p.last_day || ''),
       lastStepDay: String(p.last_step_day || ''),
       updatedAt: Number(p.updated_at) || 0,
+      retryAtSet: Number(p.retry_at_set) || 0,
     };
   });
   return {
@@ -237,7 +238,7 @@ function sync(req) {
       var row = [userId, s.key, parts[0], parts[1], parts[2], parts[3], s.status,
         String(s.correct || 0), String(s.incorrect || 0), String(s.unknown || 0), String(s.streak || 0), String(s.step || 0),
         String(s.next || ''), String(s.lastSession || ''), String(s.lastAt || 0), String(s.lastDay || ''),
-        String(s.lastStepDay || ''), String(s.updatedAt || 0)];
+        String(s.lastStepDay || ''), String(s.updatedAt || 0), String(s.retryAtSet || 0)];
       var existing = index[s.key];
       if (!existing) {
         appendRows.push(row);

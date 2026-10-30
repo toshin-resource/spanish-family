@@ -196,7 +196,7 @@ function screenHome() {
   const sum = summarize(u.states);
   const stage = sum.stageProgress[0];
   const cfg = homeCfg(s);
-  const due = dueEntries(u.states, { ...cfg, scope: 'all' }).length;
+  const due = dueEntries(u.states, { ...cfg, scope: 'all', setNo: nextSetNo(s) }).length;
   const session = u.session;
   const today = todayKey();
   const sets = u.today && u.today.date === today ? u.today.sets : 0;
@@ -289,14 +289,22 @@ function screenSetup() {
 }
 
 // ---------- 学習の開始・再開 ----------
+// 「今日の○問」のセット番号（言語ごと）。間違えた語を「次の次のセット」で出し直すのに使う
+const nextSetNo = (s = settings(), lang = LANG.code) => ((s.setNos || {})[lang] || 0) + 1;
+
 function startSession(cfg, type) {
   const u = me();
+  if (type === 'today') cfg = { ...cfg, setNo: nextSetNo(settings(), cfg.lang) };
   const queue = buildQueue(u.states, cfg, { todaySet: type === 'today' });
   if (!queue.length) {
     toast(cfg.target === 'review' || type === 'today'
       ? '今日の復習も新しい問題もありません。範囲や対象を変えてみてください。'
       : 'この条件で出題できる問題がありません。');
     return;
+  }
+  if (type === 'today') {
+    const s = settings();
+    store.updateSettings(u.profile.user_id, { setNos: { ...(s.setNos || {}), [cfg.lang]: cfg.setNo } });
   }
   if (type === 'today' && queue.length < cfg.count) toast(`出題できる問題が${queue.length}問あります（設定は${cfg.count}問）。`);
   const session = {
@@ -377,9 +385,14 @@ function prepareQuestion() {
   return ui.q;
 }
 
+// 問題を出したときの自動再生：聞き取りはすぐ、外国語が表示される問題は1秒後に読み上げる
+// （日本語→外国語と、タイ文字は答えのヒントになるので読み上げない）
 function autoPlayIfListening() {
   const q = ui.screen === 'quiz' ? prepareQuestion() : null;
-  if (q && q.entry.mode === 'listen' && !q.answered) playQuestion();
+  if (!q || q.answered) return;
+  if (q.entry.mode === 'listen') { playQuestion(); return; }
+  if (q.entry.dir !== 'es-ja' || q.item.kind === 'letter' || settings().autoSpeakQuestion === 'off') return;
+  setTimeout(() => { if (ui.q === q && ui.screen === 'quiz' && !q.answered) playQuestion(); }, 1000);
 }
 
 function playQuestion() {
@@ -554,6 +567,8 @@ function commitAnswer(result, { judgedBy = 'auto', speak = true } = {}) {
   const first = !sn.firstDone[key];
   const today = todayKey();
   const state = applyResult(u.states[key], result, { sessionId: sn.id, firstInSession: first, today });
+  // 「今日の○問」で間違えた・わからなかった語は、次の次のセットで出し直す
+  if (result !== 'correct' && sn.type === 'today' && sn.cfg.setNo) state.retryAtSet = sn.cfg.setNo + RULES.retryAfterSets;
   const answer = {
     answer_id: store.uid(),
     user_id: u.profile.user_id,
@@ -749,6 +764,8 @@ function screenSettings() {
     ${seg('choices', String(s.choices), [['4', '4択'], ['5', '5択']])}
     <label class="field-label">発音の速さ</label>
     ${seg('rate', String(s.rate), [['0.6', 'ゆっくり'], ['0.9', 'ふつう'], ['1.1', '速め']])}
+    <label class="field-label">問題を表示して1秒後に発音を読み上げる</label>
+    ${seg('autoSpeakQuestion', s.autoSpeakQuestion, [['on', 'する'], ['off', 'しない']])}
     <label class="field-label">回答したら発音を読み上げる</label>
     ${seg('autoSpeak', s.autoSpeak, [['on', 'する'], ['off', 'しない']])}
     <label class="field-label">正解のときの効果音</label>
@@ -989,7 +1006,9 @@ const actions = {
       const sn = u.session;
       const { entry } = q;
       const key = stateKey(entry.kind, entry.id, entry.dir, entry.mode);
-      store.updateState(u.profile.user_id, key, applyNotYet(u.states[key]));
+      const notYet = applyNotYet(u.states[key]);
+      if (sn.type === 'today' && sn.cfg.setNo) notYet.retryAtSet = sn.cfg.setNo + RULES.retryAfterSets;
+      store.updateState(u.profile.user_id, key, notYet);
       const n = sn.retries[key] || 0;
       if (n < RULES.maxRetriesPerItem) {
         sn.retries[key] = n + 1;

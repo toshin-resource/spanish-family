@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS = {
   wordScope: 'all', // 単語の範囲：all（すべてを順番に）/ 1・2 …（その段階だけ）
   letterScope: 'all', // タイ文字の範囲：all / 子音 / 母音 / 声調記号
   ipa: 'latam', // 発音記号：latam 中南米 / ar アルゼンチン / off 表示しない
+  autoSpeakQuestion: 'on', // 問題を表示して1秒後に読み上げる（外国語が表示される問題だけ）
   autoSpeak: 'on', // 回答したら発音を読み上げる
   sfx: 'on', // 正解のときに効果音を鳴らす
 };
@@ -267,7 +268,8 @@ export async function pullUser(id) {
   for (const [key, s] of Object.entries(r.states || {})) {
     const local = u.states[key];
     if (!local || (!dirty[key] && (s.updatedAt || 0) >= (local.updatedAt || 0)) || (s.updatedAt || 0) > (local.updatedAt || 0)) {
-      u.states[key] = s;
+      // 古いサーバーは「出し直すセット番号」を保存していないので、そのときは端末の値を残す
+      u.states[key] = s.retryAtSet === undefined && local?.retryAtSet ? { ...s, retryAtSet: local.retryAtSet } : s;
     }
   }
   if (r.settings && (r.settingsUpdatedAt || 0) > (u.settingsUpdatedAt || 0)) {
