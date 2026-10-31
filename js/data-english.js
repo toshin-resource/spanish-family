@@ -4103,7 +4103,7 @@ const SIMILAR_GROUPS = [
 ];
 
 const WORD_ROWS = WORDS_RAW.trim().split('\n');
-export const ENGLISH_WORD_STAGES = stagesFor(WORD_ROWS.length); // 行の順番でレベルに分ける（levels.js）
+export const ENGLISH_WORD_STAGES = stagesFor(WORD_ROWS.length, 'en'); // 行の順番でレベルに分ける（levels.js）
 
 export const ENGLISH_WORDS = WORD_ROWS.map((line, i) => {
   const stage = stageIdAt(ENGLISH_WORD_STAGES, i + 1);

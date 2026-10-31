@@ -2,7 +2,7 @@
 import * as store from './store.js';
 import * as sp from './speech.js';
 import { toIpa } from './ipa.js';
-import { LEVELS } from './levels.js';
+import { levelsFor } from './levels.js';
 import {
   RULES, WORDS, PHRASES, WORD_STAGES, MEANING, meaningName, canAnswerEnglish, setMeaning, PHRASE_CATEGORIES, LETTER_CATEGORIES, LANG, LANGS, setLang, langOf, getItem, stateKey, todayKey, addDays,
   applyResult, applyNotYet, applyMastered, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor, scopeItems,
@@ -303,7 +303,7 @@ function levelSwitch(scope) {
     data-action="${soon ? 'level-soon' : 'set'}" data-name="wordScope" data-value="${v}">${label}${soon ? '<small>準備中</small>' : ''}</button>`;
   return `<div class="home-switch level-switch"><div class="seg" role="radiogroup">
     ${btn('all', 'すべて', scope === 'all', false)}
-    ${LEVELS.map((lv) => btn(String(lv.id), lv.short, scope === String(lv.id), !ready.has(String(lv.id)))).join('')}
+    ${levelsFor(LANG.code).map((lv) => btn(String(lv.id), lv.short, scope === String(lv.id), !ready.has(String(lv.id)))).join('')}
   </div></div>`;
 }
 
