@@ -2,6 +2,8 @@
 // 単語：1行 = id|英語|発音記号（アメリカ英語）|日本語（主訳）|別の正解（/区切り）|品詞|分類|ヒント
 // フレーズ：1行 = id|英語|日本語|別の言い方|場面|使い方の説明
 // - 出典：日常会話でよく使う基本語（CEFR A1 程度）を参考にした仮選定リスト（要確認）。
+import { stagesFor, stageIdAt } from './levels.js';
+
 export const ENGLISH_SOURCE = '仮選定（日常会話の基本語を参考に作成・要確認）';
 
 const WORDS_RAW = `
@@ -400,7 +402,11 @@ const SIMILAR_GROUPS = [
   ['ep40', 'ep79'],
 ];
 
-export const ENGLISH_WORDS = WORDS_RAW.trim().split('\n').map((line, i) => {
+const WORD_ROWS = WORDS_RAW.trim().split('\n');
+export const ENGLISH_WORD_STAGES = stagesFor(WORD_ROWS.length); // 行の順番でレベルに分ける（levels.js）
+
+export const ENGLISH_WORDS = WORD_ROWS.map((line, i) => {
+  const stage = stageIdAt(ENGLISH_WORD_STAGES, i + 1);
   const [id, en, ipa, ja, alts, pos, category, hint] = line.split('|');
   return {
     lang: 'en',
@@ -414,15 +420,14 @@ export const ENGLISH_WORDS = WORDS_RAW.trim().split('\n').map((line, i) => {
     article: '',
     category,
     hint: hint || '',
-    stage: 1,
-    level: 'A1',
+    stage,
+    level: ENGLISH_WORD_STAGES.find((st) => st.id === stage).level,
     order: i + 1,
     frequencyRank: i + 1,
     source: ENGLISH_SOURCE,
   };
 });
 
-export const ENGLISH_WORD_STAGES = [{ id: 1, label: `基本${ENGLISH_WORDS.length}語`, from: 1, to: ENGLISH_WORDS.length, level: 'A1' }];
 
 export const ENGLISH_PHRASES = PHRASES_RAW.trim().split('\n').map((line, i) => {
   const [id, en, ja, alts, category, note] = line.split('|');

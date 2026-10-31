@@ -5,6 +5,8 @@
 //   ʉ＝唇を横に引いた「ウ」、ə＝あいまいな「ウ」。声調は記号なし＝平声、à＝低声、â＝下声、á＝高声、ǎ＝上声。
 // - 丁寧に話すときは文末に、男性は ครับ（khráp）、女性は ค่ะ（khâ）を付ける。
 // - 出典：日常会話の基本語を参考にした仮選定リスト（要確認）。
+import { stagesFor, stageIdAt } from './levels.js';
+
 export const THAI_SOURCE = '仮選定（日常会話の基本語を参考に作成・要確認）';
 
 const WORDS_RAW = `
@@ -465,10 +467,12 @@ const SIMILAR_GROUPS = [
   ['tp42', 'tp43', 'tp44'],
 ];
 
-export const THAI_WORD_STAGES = [];
+const WORD_ROWS = WORDS_RAW.trim().split('\n');
+export const THAI_WORD_STAGES = stagesFor(WORD_ROWS.length); // 行の順番でレベルに分ける（levels.js）
 
-export const THAI_WORDS = WORDS_RAW.trim().split('\n').map((line, i) => {
+export const THAI_WORDS = WORD_ROWS.map((line, i) => {
   const [id, th, roman, ja, alts, pos, category, hint] = line.split('|');
+  const stage = stageIdAt(THAI_WORD_STAGES, i + 1);
   return {
     lang: 'th',
     kind: 'word',
@@ -481,15 +485,13 @@ export const THAI_WORDS = WORDS_RAW.trim().split('\n').map((line, i) => {
     article: '',
     category,
     hint: hint || '',
-    stage: 1,
-    level: 'A1',
+    stage,
+    level: THAI_WORD_STAGES.find((s) => s.id === stage).level,
     order: i + 1,
     frequencyRank: i + 1,
     source: THAI_SOURCE,
   };
 });
-
-THAI_WORD_STAGES.push({ id: 1, label: `基本${THAI_WORDS.length}語`, from: 1, to: THAI_WORDS.length, level: 'A1' });
 
 export const THAI_PHRASES = PHRASES_RAW.trim().split('\n').map((line, i) => {
   const [id, th, roman, ja, alts, category, note] = line.split('|');

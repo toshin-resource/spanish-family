@@ -4,6 +4,8 @@
 // - 行の順番 = 学習順（learning_order）。日常会話でよく使う基本語を前に置いている。
 // - 日本語の（ ）内は表示用の補足で、自由入力の判定では無視される。
 // - 出典：日常会話の頻出語を参考にした仮選定リスト（要確認）。厳密な頻度ランキングではない。
+import { stagesFor, stageIdAt } from './levels.js';
+
 export const WORD_SOURCE = '仮選定（日常会話の基本語を参考に作成・要確認）';
 
 const RAW = `
@@ -707,21 +709,14 @@ w697|semáforo|信号|信号機|名詞|el|移動|
 w698|parada|停留所|バス停|名詞|la|移動|
 `;
 
-const STAGES = [
-  { id: 1, label: '基本300語', from: 1, to: 300, level: 'A1' },
-  { id: 2, label: '基礎2（398語）', from: 301, to: 698, level: 'A1〜A2' },
-];
-
-function stageOf(n) {
-  const s = STAGES.find((st) => n >= st.from && n <= st.to);
-  return s ? s.id : STAGES[STAGES.length - 1].id;
-}
+const ROWS = RAW.trim().split('\n');
+const STAGES = stagesFor(ROWS.length); // 行の順番で、小学校・中学1年… のレベルに分ける（levels.js）
 
 export const WORD_STAGES = STAGES;
 
-export const WORDS = RAW.trim().split('\n').map((line, i) => {
+export const WORDS = ROWS.map((line, i) => {
   const [id, es, ja, alts, pos, article, category, hint] = line.split('|');
-  const stage = stageOf(i + 1);
+  const stage = stageIdAt(STAGES, i + 1);
   return {
     lang: 'es',
     kind: 'word',

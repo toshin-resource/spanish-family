@@ -211,7 +211,7 @@ function screenHome() {
   const u = me();
   const s = settings();
   const sum = summarize(u.states);
-  const stage = sum.stageProgress[0];
+  const stage = (s.wordScope !== 'all' && sum.stageProgress.find((x) => String(x.id) === String(s.wordScope))) || sum.stage;
   const cfg = homeCfg(s);
   const due = dueEntries(u.states, { ...cfg, scope: 'all', setNo: nextSetNo(s) }).length;
   const session = u.session;
@@ -262,6 +262,7 @@ function screenHome() {
   <section class="card home-card">
     <div class="home-switch lang-switch">${seg('lang', s.lang, Object.values(LANGS).map((l) => [l.code, `<span class="flag">${LANG_FLAG[l.code] || ''}</span>${l.name}`]))}</div>
     <div class="home-switch">${seg('kind', cfg.kind, [['word', '単語'], ['phrase', 'フレーズ'], ...(LANG.letters.length ? [['letter', 'タイ文字']] : [])])}</div>
+    ${cfg.kind === 'word' && WORD_STAGES.length > 1 ? `<div class="home-switch level-switch">${seg('wordScope', String(cfg.scope), [['all', 'すべて'], ...WORD_STAGES.map((st) => [String(st.id), st.short || st.label])])}</div>` : ''}
     <div class="home-switch">${seg('homeDir', m.dir, [['es-ja', `${LANG.name} → 日本語`], ['ja-es', `日本語 → ${LANG.name}`]])}</div>
     ${m.dir === 'mix' ? '<p class="muted small center">いまはミックス（両方向）で出題します</p>' : ''}
 
@@ -290,7 +291,7 @@ function screenHome() {
 }
 
 // ホームのとーまくんのひとこと（状況に合わせて変える）
-const LANG_FLAG = { es: '🇦🇷', th: '🇹🇭', en: '🇺🇸' };
+const LANG_FLAG = { es: '🇪🇸', th: '🇹🇭', en: '🇺🇸' };
 const LANG_HELLO = { es: '¡Hola!', th: 'สวัสดี!', en: 'Hello!' };
 const LANG_MORNING = { es: '¡Buenos días!', th: 'อรุณสวัสดิ์!', en: 'Good morning!' };
 const LANG_NIGHT = { es: '¡Buenas noches!', th: 'ราตรีสวัสดิ์!', en: 'Good night!' };
@@ -313,7 +314,7 @@ function tomaSays({ name, session, sets, due }) {
 // 範囲の選択肢（単語は段階、フレーズは場面、文字は子音・母音など）と、それを保存する設定の名前
 function scopeOptions(kind) {
   const opts = kind === 'word'
-    ? [['all', 'すべて（順番に）'], ...WORD_STAGES.map((st) => [String(st.id), `${st.label}`])]
+    ? [['all', 'すべて（順番に）'], ...WORD_STAGES.map((st) => [String(st.id), `${st.label}（${st.to - st.from + 1}語）`])]
     : kind === 'letter'
       ? [['all', 'すべての文字'], ...LETTER_CATEGORIES.map((c) => [c, c])]
       : [['all', 'すべての場面'], ...PHRASE_CATEGORIES.map((c) => [c, c])];

@@ -157,6 +157,8 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 .home-switch .seg button { flex: 1 1 0; min-width: 0; min-height: 42px; padding: 6px 4px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); font-size: 0.92rem; font-weight: 700; transition: background 0.15s, color 0.15s; }
 .home-switch .seg button.on { background: #fff; color: var(--celeste-deep); box-shadow: 0 1px 3px rgba(26, 42, 64, 0.16); }
 .lang-switch .seg button { min-height: 48px; font-size: 0.98rem; }
+.level-switch .seg { flex-wrap: wrap; }
+.level-switch .seg button { flex: 1 0 30%; min-height: 38px; font-size: 0.84rem; }
 .flag { margin-right: 5px; font-size: 1.1rem; vertical-align: -1px; }
 .resume-btn {
   width: 100%; margin: 12px 0 0; justify-content: flex-start; gap: 12px; padding: 10px 14px; border: 0; border-radius: 18px;
