@@ -18,7 +18,7 @@ const ui = {
   screen: 'users',
   q: null, // 表示中の問題（一時的な状態）
   result: null, // 直前の学習の結果
-  list: { filter: 'all', scope: '1' },
+  list: { filter: 'all', scope: '1', limit: 200 }, // 単語リストは200語ずつ表示（語数が多いと画面が重くなるため）
   phraseCat: 'あいさつ',
   letterCat: '子音',
   usersError: '',
@@ -785,7 +785,7 @@ function screenList() {
     ${seg('list-filter', filter, [['all', 'すべて'], ['new', '未学習'], ['learning', '学習中'], ['mastered', '習得済み'], ['unmastered', '未習得']])}
     <p class="muted small">状態は「${LANG.name}→日本語（文字あり）」の結果です。「未習得」は未学習と学習中の両方を含みます。もう知っている単語は「習得済みにする」を押すと、覚えた単語に入ります。${rows.length}語</p>
     <ul class="word-list">
-      ${rows.map(({ w, st }) => `
+      ${rows.slice(0, ui.list.limit).map(({ w, st }) => `
         <li>
           <button class="icon-btn" data-action="play" data-id="${w.id}" aria-label="発音">🔊</button>
           <div class="wl-main"><div class="es">${esWithArticle(w)}</div>${ipaLine(w)}<div class="ja">${esc(w.ja)}</div>${exampleBlock(w, { compact: true })}</div>
@@ -796,6 +796,7 @@ function screenList() {
               : `<button class="mark-btn" data-action="list-mastered" data-id="${w.id}" data-value="on">✓ 習得済み<br>にする</button>`}</div>
         </li>`).join('')}
     </ul>
+    ${rows.length > ui.list.limit ? `<button class="btn wide" data-action="list-more">もっと見る（残り${rows.length - ui.list.limit}語）</button>` : ''}
   </section>`;
 }
 
@@ -1323,8 +1324,8 @@ const actions = {
   },
   set: (el) => {
     const { name, value } = el.dataset;
-    if (name === 'list-scope') { ui.list.scope = value; return render(); }
-    if (name === 'list-filter') { ui.list.filter = value; return render(); }
+    if (name === 'list-scope') { ui.list.scope = value; ui.list.limit = 200; return render(); }
+    if (name === 'list-filter') { ui.list.filter = value; ui.list.limit = 200; return render(); }
     // ホームの方向切り替え：聞き取りは「音声→日本語」だけなので、日本語→スペイン語を選んだら文字ありに戻す
     if (name === 'homeDir') {
       const patch = { dir: value };
@@ -1437,6 +1438,7 @@ const actions = {
     if (q && !q.answered) q.choicesHidden = hide;
     render();
   },
+  'list-more': () => { ui.list.limit += 200; render(); },
   'level-soon': () => toast(`この段階の${LANG.name}の単語は、いま準備中です。`, 2500),
   'dont-know': () => {
     const q = ui.q;
