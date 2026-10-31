@@ -1290,8 +1290,9 @@ function render() {
 
 // 画面上部の固定バー：ホーム以外の画面では、アプリ名の代わりに「ホームへ戻る」ボタンを出す
 function renderHeader() {
-  document.title = `はじめの${LANG.name}`;
-  if (['home', 'users', 'passcode'].includes(ui.screen)) { $brand.innerHTML = `${fun() ? '<img class="brand-toma" src="img/toma-stand.webp" alt="" width="26" height="34">' : '<span class="sun" aria-hidden="true"></span>'}<span>はじめの${LANG.name}</span>`; return; }
+  const appName = `${fun() ? 'とーまくんの' : 'はじめの'}${LANG.name}`; // フォーマルのときは「はじめの○○」
+  document.title = appName;
+  if (['home', 'users', 'passcode'].includes(ui.screen)) { $brand.innerHTML = `${fun() ? '<img class="brand-toma" src="img/toma-stand.webp" alt="" width="26" height="34">' : '<span class="sun" aria-hidden="true"></span>'}<span>${appName}</span>`; return; }
   const label = me() ? '← ホーム' : '← もどる';
   $brand.innerHTML = `<button class="btn small back home-nav" data-action="home-nav">${label}</button>`;
 }
