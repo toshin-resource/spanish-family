@@ -620,8 +620,7 @@ function feedback(q) {
   }
   return `
   <div class="feedback ${kind}">
-    <div class="verdict-banner">${banner}</div>
-    ${fun() && !q.pending ? `<img class="fb-sticker" src="img/${{ ok: 'st-iine', ng: 'st-daijobu', unknown: 'st-hatena' }[kind]}.webp" alt="" width="76" height="76">` : ''}
+    <div class="verdict-banner">${fun() && !q.pending ? `<img class="fb-sticker" src="img/${{ ok: 'st-iine', ng: 'st-daijobu', unknown: 'st-hatena' }[kind]}.webp" alt="" width="60" height="60">` : ''}<span>${banner}</span></div>
     <div class="fb-row right">
       <span class="fb-label">正しい答え</span>
       <span class="fb-value">${esc(rightLabel)}${rightSub}</span>
