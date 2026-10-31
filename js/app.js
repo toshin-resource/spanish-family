@@ -241,7 +241,7 @@ function screenHome() {
       <button class="who-pill" data-action="switch-user" aria-label="利用者を変更">
         <span class="avatar sm">${esc([...u.profile.display_name][0] || '?')}</span>${esc(u.profile.display_name)} さん<span class="who-change">変更</span>
       </button>
-      <span class="time-pill">⏱ 今日 ${fmtDuration(todayMs)}</span>
+      <span class="time-pill"><span class="tp-icon" aria-hidden="true">⏱</span><span class="tp-rows"><span>今日 <b>${fmtDuration(todayMs)}</b></span><span>合計 <b>${fmtDuration(s.studyTotalMs)}</b></span></span></span>
     </div>
     <div class="hero-main">
       <div class="hero-stat">
@@ -261,7 +261,7 @@ function screenHome() {
       <div><b>${sum.masteredPhrases}<small>/${sum.totalPhrases}</small></b><span>フレーズ</span></div>
       ${sum.totalLetters ? `<div><b>${sum.masteredLetters}<small>/${sum.totalLetters}</small></b><span>文字</span></div>` : ''}
     </div>
-    <p class="hero-note">覚えた単語＝${esc(LANG.name)}→日本語（文字あり）で習得済みの数。学習時間の合計 ${fmtDuration(s.studyTotalMs)}</p>
+    <p class="hero-note">覚えた単語＝${esc(LANG.name)}→日本語（文字あり）で習得済みの数</p>
   </section>
 
   <section class="card home-card">
