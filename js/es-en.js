@@ -1,5 +1,5 @@
 // スペイン語の単語の英語の意味と、例文の英訳（「英語で答える」で使う）
-// 1行 = 単語のid|英語の意味|別の正解（/区切り）|例文の英訳
+// 1行 = 単語・フレーズのid|英語の意味|別の正解（/区切り）|例文の英訳（フレーズは空）
 const RAW = `
 w001|hello|hi/hey|Hello! How are you?
 w002|thank you|thanks|Thank you very much for your help.
@@ -4001,6 +4001,86 @@ w3997|foolishness|folly/madness/stupidity|It was foolish to go out in the storm.
 w3998|jubilation|joy/delight|They received the news with joy.
 w3999|burden|drag/dead weight|Debts are a burden for the family.
 w4000|lucidity|clarity/clear-headedness|He spoke with great clarity.
+p001|Hello|Hi|
+p002|Good morning||
+p003|Good afternoon||
+p004|Good evening|Good night|
+p005|How are you?|How's it going?|
+p006|How are you? (polite)|How do you do?|
+p007|Fine, thanks|I'm fine, thank you/Good, thanks|
+p008|And you?|What about you?|
+p009|Nice to meet you|Pleased to meet you|
+p010|See you later|See you|
+p011|See you tomorrow||
+p012|Bye|Bye-bye|
+p013|Welcome||
+p014|Thank you|Thanks|
+p015|Thank you very much|Thanks a lot|
+p016|You're welcome|No problem|
+p017|Please||
+p018|Sorry|Excuse me|
+p019|I'm sorry||
+p020|Excuse me (to get attention)|Excuse me|
+p021|No problem|That's fine|
+p022|Excuse me (to pass)|Excuse me/May I?|
+p023|My name is …|I'm …|
+p024|What's your name?||
+p025|I'm from Japan|I come from Japan|
+p026|I'm Japanese||
+p027|Where are you from?||
+p028|I'm … years old||
+p029|I speak a little Spanish||
+p030|I don't speak Spanish||
+p031|Do you speak English?||
+p032|Pleased to meet you|Delighted/Nice to meet you|
+p033|I don't understand||
+p034|Could you repeat that, please?|Can you say that again?|
+p035|More slowly, please|Slower, please|
+p036|What does … mean?||
+p037|How do you say … in Spanish?||
+p038|Pardon?|Sorry?/What?|
+p039|I don't know||
+p040|Just a moment, please|One moment, please|
+p041|Yes, of course|Sure|
+p042|How much is it?|How much does it cost?|
+p043|I want this|I'd like this|
+p044|Do you have …?||
+p045|I'm just looking||
+p046|It's very expensive|It's too expensive|
+p047|Can I pay by card?|Can I pay with a card?|
+p048|I'll take it||
+p049|Could I have a bag?|Can I get a bag?|
+p050|A table for two, please||
+p051|The menu, please|Could I see the menu?|
+p052|I'd like …||
+p053|For me, …|I'll have …|
+p054|Water, please||
+p055|Delicious!|How tasty!|
+p056|The check, please|The bill, please|
+p057|Cheers!||
+p058|Enjoy your meal!|Bon appétit!|
+p059|I'm full||
+p060|I'm hungry||
+p061|Where is the bathroom?|Where is the restroom?/Where is the toilet?|
+p062|Where is …?||
+p063|How do I get to …?||
+p064|I want to go to …|I'd like to go to …|
+p065|Is it far?||
+p066|It's close|It's near|
+p067|To the right|On the right|
+p068|To the left|On the left|
+p069|Straight ahead|Go straight|
+p070|What time does the train leave?||
+p071|One ticket, please||
+p072|Help!||
+p073|I need help||
+p074|I'm lost||
+p075|Call the police||
+p076|I feel sick|I don't feel well|
+p077|I need a doctor||
+p078|I lost my passport||
+p079|It's no big deal|Don't worry/It's OK|
+p080|Can you help me?|Could you help me?|
 `;
 
 export const ES_EN = Object.fromEntries(

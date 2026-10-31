@@ -12,7 +12,7 @@ import { ES_EN } from './es-en.js';
 for (const w of ES_WORDS) w.example = EXAMPLES_ES[w.id] || null;
 for (const w of THAI_WORDS) w.example = EXAMPLES_TH[w.id] || null;
 for (const w of ENGLISH_WORDS) w.example = EXAMPLES_EN[w.id] || null;
-for (const w of ES_WORDS) w.en = ES_EN[w.id] || null; // 英語の意味（スペイン語を英語で答えるとき）
+for (const w of [...ES_WORDS, ...ES_PHRASES]) w.en = ES_EN[w.id] || null; // 英語の意味（スペイン語を英語で答えるとき）
 
 // 学習できる言語。項目（単語・フレーズ）の id は言語ごとに別なので、学習記録が混ざらない
 export const LANGS = {
@@ -43,7 +43,7 @@ export function setMeaning(m) {
   const want = m === 'en' && canAnswerEnglish() ? 'en' : 'ja';
   if (want === MEANING) return;
   MEANING = want;
-  for (const w of ES_WORDS) {
+  for (const w of [...ES_WORDS, ...ES_PHRASES]) {
     if (!w.en) continue;
     if (!w.jaOrig) w.jaOrig = { ja: w.ja, accepted: w.accepted, exJa: w.example ? w.example.ja : '' };
     if (want === 'en') {
