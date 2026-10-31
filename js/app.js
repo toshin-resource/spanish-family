@@ -2,6 +2,7 @@
 import * as store from './store.js';
 import * as sp from './speech.js';
 import { toIpa } from './ipa.js';
+import { LEVELS } from './levels.js';
 import {
   RULES, WORDS, PHRASES, WORD_STAGES, PHRASE_CATEGORIES, LETTER_CATEGORIES, LANG, LANGS, setLang, langOf, getItem, stateKey, todayKey, addDays,
   applyResult, applyNotYet, applyMastered, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor, scopeItems,
@@ -201,7 +202,8 @@ function homeCfg(s = settings()) {
     answerMode: s.answerMode,
     presentation: s.presentation,
     lang: s.lang,
-    scope: kind === 'word' ? s.wordScope : kind === 'letter' ? s.letterScope : s.phraseScope,
+    // 選んだレベルにこの言語の単語がまだないときは「すべて」で出題する
+    scope: kind === 'word' ? (WORD_STAGES.some((st) => String(st.id) === String(s.wordScope)) ? s.wordScope : 'all') : kind === 'letter' ? s.letterScope : s.phraseScope,
     target: s.target,
     count: s.setSize,
   };
@@ -262,7 +264,7 @@ function screenHome() {
   <section class="card home-card">
     <div class="home-switch lang-switch">${seg('lang', s.lang, Object.values(LANGS).map((l) => [l.code, `<span class="flag">${LANG_FLAG[l.code] || ''}</span>${l.name}`]))}</div>
     <div class="home-switch">${seg('kind', cfg.kind, [['word', '単語'], ['phrase', 'フレーズ'], ...(LANG.letters.length ? [['letter', 'タイ文字']] : [])])}</div>
-    ${cfg.kind === 'word' && WORD_STAGES.length > 1 ? `<div class="home-switch level-switch">${seg('wordScope', String(cfg.scope), [['all', 'すべて'], ...WORD_STAGES.map((st) => [String(st.id), st.short || st.label])])}</div>` : ''}
+    ${cfg.kind === 'word' ? levelSwitch(String(cfg.scope)) : ''}
     <div class="home-switch">${seg('homeDir', m.dir, [['es-ja', `${LANG.name} → 日本語`], ['ja-es', `日本語 → ${LANG.name}`]])}</div>
     ${m.dir === 'mix' ? '<p class="muted small center">いまはミックス（両方向）で出題します</p>' : ''}
 
@@ -288,6 +290,17 @@ function screenHome() {
     </div>
     <button class="btn ghost wide small" data-action="a2hs">ホーム画面に追加する方法</button>
   </section>`;
+}
+
+// ホームのレベル切り替え：5段階をいつも並べ、単語がまだない段階は「準備中」にする
+function levelSwitch(scope) {
+  const ready = new Set(WORD_STAGES.map((st) => String(st.id)));
+  const btn = (v, label, on, soon) => `<button type="button" role="radio" aria-checked="${on}" class="${on ? 'on' : ''}${soon ? ' soon' : ''}"
+    data-action="${soon ? 'level-soon' : 'set'}" data-name="wordScope" data-value="${v}">${label}${soon ? '<small>準備中</small>' : ''}</button>`;
+  return `<div class="home-switch level-switch"><div class="seg" role="radiogroup">
+    ${btn('all', 'すべて', scope === 'all', false)}
+    ${LEVELS.map((lv) => btn(String(lv.id), lv.short, scope === String(lv.id), !ready.has(String(lv.id)))).join('')}
+  </div></div>`;
 }
 
 // ホームのとーまくんのひとこと（状況に合わせて変える）
@@ -1404,6 +1417,7 @@ const actions = {
     if (q && !q.answered) q.choicesHidden = hide;
     render();
   },
+  'level-soon': () => toast(`この段階の${LANG.name}の単語は、いま準備中です。`, 2500),
   'dont-know': () => {
     const q = ui.q;
     if (!q || q.answered) return;
