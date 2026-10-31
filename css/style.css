@@ -193,8 +193,13 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 .tile-text b { font-size: 0.98rem; white-space: nowrap; }
 .tile-text small { font-size: 0.72rem; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand-toma { height: 34px; width: auto; margin: -4px 0; }
-.result-toma { display: block; width: auto; height: 128px; margin: 0 auto 6px; }
-@media (prefers-reduced-motion: reduce) { .toma { animation: none; } }
+.result-toma { display: block; width: 140px; height: auto; margin: 0 auto 6px; }
+.toma.sticker { height: auto; width: 128px; margin-right: 0; }
+.feedback { position: relative; }
+.fb-sticker { position: absolute; top: -18px; right: 2px; width: 76px; height: 76px; filter: drop-shadow(0 3px 4px rgba(26, 42, 64, 0.2)); animation: sticker-pop 0.35s ease-out; pointer-events: none; }
+@keyframes sticker-pop { from { transform: scale(0.4) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.today-go { width: 56px; height: 56px; flex: none; margin-right: 8px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.7); color: var(--sun-deep); font-size: 1.4rem; }
+@media (prefers-reduced-motion: reduce) { .toma, .fb-sticker { animation: none; } }
 
 /* ---- 学習画面 ---- */
 .quiz-top { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
