@@ -4,7 +4,7 @@ import * as sp from './speech.js';
 import { toIpa } from './ipa.js';
 import { LEVELS } from './levels.js';
 import {
-  RULES, WORDS, PHRASES, WORD_STAGES, PHRASE_CATEGORIES, LETTER_CATEGORIES, LANG, LANGS, setLang, langOf, getItem, stateKey, todayKey, addDays,
+  RULES, WORDS, PHRASES, WORD_STAGES, MEANING, meaningName, canAnswerEnglish, setMeaning, PHRASE_CATEGORIES, LETTER_CATEGORIES, LANG, LANGS, setLang, langOf, getItem, stateKey, todayKey, addDays,
   applyResult, applyNotYet, applyMastered, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor, scopeItems,
 } from './learn.js';
 
@@ -31,7 +31,7 @@ const me = () => store.user();
 const settings = () => ({ ...store.DEFAULT_SETTINGS, ...(me()?.settings || {}) });
 const STATUS_LABEL = { new: '未学習', learning: '学習中', mastered: '習得済み' };
 // 出題方向の表示名（言語名は選んでいる言語、または問題の言語）
-const dirLabel = (dir, name = LANG.name) => ({ 'es-ja': `${name} → 日本語`, 'ja-es': `日本語 → ${name}`, mix: 'ミックス' }[dir]);
+const dirLabel = (dir, name = LANG.name) => ({ 'es-ja': `${name} → ${meaningName()}`, 'ja-es': `${meaningName()} → ${name}`, mix: 'ミックス' }[dir]);
 const KIND_LABEL = { word: '単語', phrase: 'フレーズ', letter: '文字' };
 // 読み上げる文字列（文字の学習では文字の名前を読む）
 const sayText = (item) => item.speak || item.es;
@@ -62,7 +62,10 @@ function exampleBlock(item, { compact = false } = {}) {
       ${compact ? '' : '<span class="ex-label">例文</span>'}
       <div class="ex-text" lang="${esc(item.lang)}">${esc(ex.text)}</div>
       ${ex.roman ? `<div class="ex-roman">${esc(ex.roman)}</div>` : ''}
-      <div class="ex-ja">${esc(ex.ja)}</div>
+      ${item.en && item.en.example
+        // スペイン語の例文：日本語訳と英訳を両方出す（英語で答えるときも日本語訳を残す）
+        ? `<div class="ex-ja">${esc(item.jaOrig ? item.jaOrig.exJa : ex.ja)}</div><div class="ex-en" lang="en">🇺🇸 ${esc(item.en.example)}</div>`
+        : `<div class="ex-ja">${esc(ex.ja)}</div>`}
     </div>
   </div>`;
 }
@@ -265,7 +268,8 @@ function screenHome() {
     <div class="home-switch lang-switch">${seg('lang', s.lang, Object.values(LANGS).map((l) => [l.code, `<span class="flag">${LANG_FLAG[l.code] || ''}</span>${l.name}`]))}</div>
     <div class="home-switch">${seg('kind', cfg.kind, [['word', '単語'], ['phrase', 'フレーズ'], ...(LANG.letters.length ? [['letter', 'タイ文字']] : [])])}</div>
     ${cfg.kind === 'word' ? levelSwitch(String(cfg.scope)) : ''}
-    <div class="home-switch">${seg('homeDir', m.dir, [['es-ja', `${LANG.name} → 日本語`], ['ja-es', `日本語 → ${LANG.name}`]])}</div>
+    <div class="home-switch">${seg('homeDir', m.dir, [['es-ja', dirLabel('es-ja')], ['ja-es', dirLabel('ja-es')]])}</div>
+    ${LANG.code === 'es' && canAnswerEnglish() ? `<div class="home-switch answer-lang">${seg('answerLang', s.answerLang === 'en' ? 'en' : 'ja', [['ja', '🇯🇵 日本語で答える'], ['en', '🇺🇸 英語で答える']])}</div>` : ''}
     ${m.dir === 'mix' ? '<p class="muted small center">いまはミックス（両方向）で出題します</p>' : ''}
 
     ${session ? `<button class="btn resume-btn" data-action="resume">
@@ -1119,7 +1123,7 @@ async function startAuto() {
       if (!live()) return;
       auto.phase = 'ja';
       render();
-      await sp.speak(it.ja, { lang: 'ja', rate: 1 });
+      await sp.speak(it.ja, { lang: it.lang === 'es' ? MEANING : 'ja', rate: 1 });
       if (!live()) return;
       if (s.autoExample === 'read' && it.example) {
         await autoWait(AUTO_GAP_MS);
@@ -1130,7 +1134,7 @@ async function startAuto() {
         if (!live()) return;
         await autoWait(400);
         if (!live()) return;
-        await sp.speak(it.example.ja, { lang: 'ja', rate: 1 });
+        await sp.speak(it.example.ja, { lang: it.lang === 'es' ? MEANING : 'ja', rate: 1 });
         if (!live()) return;
       }
       auto.phase = '';
@@ -1295,6 +1299,7 @@ const SCREENS = {
 
 function render() {
   setLang(settings().lang);
+  setMeaning(LANG.code === 'es' && settings().answerLang === 'en' ? 'en' : 'ja'); // スペイン語は英語でも答えられる
   // 保存先はクラウド。合言葉が入るまでは学習を始めない
   if (store.needsKey()) ui.screen = 'passcode';
   else if (ui.screen === 'passcode') ui.screen = me() ? 'home' : 'users';

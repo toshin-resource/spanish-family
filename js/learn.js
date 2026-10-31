@@ -6,11 +6,13 @@ import { EXAMPLES_ES } from './examples-es.js';
 import { EXAMPLES_TH } from './examples-th.js';
 import { ENGLISH_WORDS, ENGLISH_PHRASES, ENGLISH_WORD_STAGES } from './data-english.js';
 import { EXAMPLES_EN } from './examples-en.js';
+import { ES_EN } from './es-en.js';
 
 // 単語に例文を付ける（{ text, roman?, ja }）
 for (const w of ES_WORDS) w.example = EXAMPLES_ES[w.id] || null;
 for (const w of THAI_WORDS) w.example = EXAMPLES_TH[w.id] || null;
 for (const w of ENGLISH_WORDS) w.example = EXAMPLES_EN[w.id] || null;
+for (const w of ES_WORDS) w.en = ES_EN[w.id] || null; // 英語の意味（スペイン語を英語で答えるとき）
 
 // 学習できる言語。項目（単語・フレーズ）の id は言語ごとに別なので、学習記録が混ざらない
 export const LANGS = {
@@ -31,6 +33,30 @@ export function setLang(code) {
   WORD_STAGES = LANG.stages;
 }
 export const langOf = (item) => LANGS[item?.lang] || LANG;
+
+// 答える言語（意味の言語）：ja 日本語 / en 英語。英語はスペイン語の単語だけ選べる。
+// 英語のときは、単語の意味（ja・accepted）と例文の訳を英語に入れ替える（画面・選択肢・判定はそのまま使える）
+export let MEANING = 'ja';
+export const meaningName = () => (MEANING === 'en' ? '英語' : '日本語');
+export const canAnswerEnglish = () => ES_WORDS.some((w) => w.en);
+export function setMeaning(m) {
+  const want = m === 'en' && canAnswerEnglish() ? 'en' : 'ja';
+  if (want === MEANING) return;
+  MEANING = want;
+  for (const w of ES_WORDS) {
+    if (!w.en) continue;
+    if (!w.jaOrig) w.jaOrig = { ja: w.ja, accepted: w.accepted, exJa: w.example ? w.example.ja : '' };
+    if (want === 'en') {
+      w.ja = w.en.en;
+      w.accepted = [w.en.en, ...w.en.alts];
+      if (w.example && w.en.example) w.example.ja = w.en.example;
+    } else {
+      w.ja = w.jaOrig.ja;
+      w.accepted = w.jaOrig.accepted;
+      if (w.example) w.example.ja = w.jaOrig.exJa;
+    }
+  }
+}
 
 // 変更しやすい初期値（仕様書で「暫定」とされている値）
 export const RULES = {
@@ -164,6 +190,7 @@ export function buildChoices(item, dir, count = 4) {
   const used = new Set([label(item)]);
   const pool = shuffle(itemsOf(item.kind, item.lang)).filter((o) => {
     if (o.id === item.id) return false;
+    if (MEANING === 'en' && o.lang === 'es' && !o.en) return false; // 英語で答えるときは、英語の意味がある語だけ
     if (item.similarGroup && o.similarGroup === item.similarGroup) return false;
     if (overlaps(item, o)) return false;
     if (normalize(o.es) === normalize(item.es)) return false;
@@ -275,7 +302,7 @@ export function effectiveMode(cfg) {
   const presentation = cfg.presentation === 'listen' ? 'listen' : 'text';
   const dir = presentation === 'listen' ? 'es-ja' : cfg.dir;
   // 学習する言語での自由入力は未対応のため、日本語→外国語とミックスは選択式にする。文字の学習も選択式
-  const answerMode = dir === 'es-ja' && cfg.kind !== 'letter' ? cfg.answerMode : 'choice';
+  const answerMode = dir === 'es-ja' && cfg.kind !== 'letter' && MEANING === 'ja' ? cfg.answerMode : 'choice'; // 英語で答えるときも選択式
   return { presentation, dir, answerMode };
 }
 
