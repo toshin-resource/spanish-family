@@ -234,6 +234,13 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 }
 .play-big span { font-size: 0.85rem; font-weight: 700; margin-top: 2px; }
 .choices { display: grid; gap: 8px; }
+.choice-toggle { display: block; margin: 0 0 6px auto; padding: 4px 12px; min-height: 34px; border-radius: 99px; border: 1px solid var(--line); background: #fff; color: var(--celeste-deep); font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+.reveal-choices {
+  width: 100%; min-height: 150px; margin: 4px 0 8px; border-radius: 16px; border: 2px dashed var(--celeste); background: #f4f9fe;
+  color: var(--celeste-deep); font-size: 1.25rem; font-weight: 800; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+.reveal-choices span { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.reveal-choices + .choice-toggle { margin: 0 auto; }
 .choice {
   min-height: 52px; padding: 8px 14px; border-radius: 14px; border: 2px solid var(--line); background: #fff;
   font-size: 1.15rem; font-weight: 700; cursor: pointer; text-align: center; touch-action: manipulation;

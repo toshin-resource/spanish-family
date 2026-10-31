@@ -460,6 +460,8 @@ function prepareQuestion() {
     matched: null,
     audioError: false,
     listeningNow: false,
+    // 選択肢を隠す設定のときは、答えを思い浮かべてから「選択肢を見る」で出す
+    choicesHidden: entry.answerMode === 'choice' && s.hideChoices === 'on',
   };
   return ui.q;
 }
@@ -535,8 +537,12 @@ function screenQuiz() {
   }
 
   let answerArea = '';
-  if (entry.answerMode === 'choice') {
-    answerArea = `<div class="choices">${q.choices.map((id) => {
+  if (entry.answerMode === 'choice' && q.choicesHidden && !revealed) {
+    answerArea = `
+      <button class="reveal-choices" data-action="show-choices">👀 選択肢を見る<span>答えを思い浮かべてから押してください</span></button>
+      <button class="choice-toggle" data-action="toggle-choices">👁 選択肢をはじめから表示する</button>`;
+  } else if (entry.answerMode === 'choice') {
+    answerArea = `${!revealed ? '<button class="choice-toggle" data-action="toggle-choices">🙈 選択肢を隠す</button>' : ''}<div class="choices">${q.choices.map((id) => {
       const c = getItem(id);
       let cls = '';
       if (q.answered) {
@@ -576,7 +582,7 @@ function screenQuiz() {
     </div>
     <div class="prompt">${prompt}</div>
     ${answerArea}
-    ${!revealed ? (answerSeconds() > 0
+    ${!revealed && !q.choicesHidden ? (answerSeconds() > 0
       ? `<div class="countdown"><div class="cd-track"><div class="cd-bar" id="cd-bar"></div></div><span id="cd-text">${listen && !q.audioDone ? '音声のあとで数えます' : `あと${answerSeconds()}秒`}</span></div>`
       : '<button class="btn ghost wide" data-action="dont-know">わからない</button>') : ''}
     ${revealed ? feedback(q) : ''}
@@ -847,6 +853,8 @@ function screenSettings() {
     <label class="field-label">1セットの問題数（今日の○問）</label>
     <div class="row"><button class="btn small" data-action="size" data-delta="-5">−5</button>
       <span class="num">${s.setSize}問</span><button class="btn small" data-action="size" data-delta="5">＋5</button></div>
+    <label class="field-label">選択式の問題で、選択肢を</label>
+    ${seg('hideChoices', s.hideChoices, [['off', 'はじめから表示'], ['on', '隠しておく（押すと表示）']])}
     <label class="field-label">選択肢の数</label>
     ${seg('choices', String(s.choices), [['4', '4択'], ['5', '5択']])}
     <label class="field-label">発音の速さ</label>
@@ -979,7 +987,7 @@ function restartCountdown(q) {
 }
 function ensureCountdown() {
   const q = ui.screen === 'quiz' ? ui.q : null;
-  if (!q || q.answered || q.pending || q.listeningNow || answerSeconds() <= 0) { stopCountdown(); return; }
+  if (!q || q.answered || q.pending || q.listeningNow || q.choicesHidden || answerSeconds() <= 0) { stopCountdown(); return; }
   if (q.entry.mode === 'listen' && !q.audioDone) return; // 聞き取りは音声を聞き終わってから数える
   if (countdown.q === q && countdown.timer) { tickCountdown(); return; }
   stopCountdown();
@@ -1344,6 +1352,21 @@ const actions = {
     if (!q || q.answered) return;
     q.picked = el.dataset.id;
     commitAnswer(q.picked === q.item.id ? 'correct' : 'wrong');
+  },
+  // この問題だけ選択肢を出す
+  'show-choices': () => {
+    const q = ui.q;
+    if (!q || q.answered) return;
+    q.choicesHidden = false;
+    render();
+  },
+  // 「選択肢を隠す／はじめから表示する」：設定を切り替え、表示中の問題にもすぐ反映する
+  'toggle-choices': () => {
+    const q = ui.q;
+    const hide = settings().hideChoices !== 'on';
+    store.updateSettings(store.currentUid(), { hideChoices: hide ? 'on' : 'off' });
+    if (q && !q.answered) q.choicesHidden = hide;
+    render();
   },
   'dont-know': () => {
     const q = ui.q;
