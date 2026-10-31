@@ -4,7 +4,7 @@ import * as sp from './speech.js';
 import { toIpa } from './ipa.js';
 import {
   RULES, WORDS, PHRASES, WORD_STAGES, PHRASE_CATEGORIES, LETTER_CATEGORIES, LANG, LANGS, setLang, langOf, getItem, stateKey, todayKey, addDays,
-  applyResult, applyNotYet, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor, scopeItems,
+  applyResult, applyNotYet, applyMastered, judgeInput, buildChoices, buildQueue, dueEntries, effectiveMode, summarize, itemStatus, labelFor, scopeItems,
 } from './learn.js';
 
 const $main = document.getElementById('main');
@@ -219,50 +219,86 @@ function screenHome() {
   const sets = u.today && u.today.date === today ? u.today.sets : 0;
   const pct = stage.total ? Math.round((stage.mastered / stage.total) * 100) : 0;
   const m = effectiveMode(cfg);
+  const todayMs = s.studyDay && s.studyDay.date === today ? s.studyDay.ms : 0;
+  const toma = tomaSays({ name: u.profile.display_name, session, sets, due });
+  const tiles = [
+    ['auto-open', '', '🎧', '自動再生', '聞き流し'],
+    ['go', 'setup', '🎯', '学習を選ぶ', '方向・範囲・問題数'],
+    ['unmastered', '', '🔁', '未習得だけ', 'まとめて復習'],
+    ['go', 'list', '📖', '単語リスト', '習得済みにする'],
+    ['go', 'phrases', '💬', 'フレーズ集', '場面ごとに'],
+    ...(LANG.letters.length ? [['go', 'letters', 'ก', 'タイ文字', '一覧と読み']] : []),
+    ['go', 'settings', '⚙️', '設定', '声・時間など'],
+  ];
   return `
   <section class="hero">
     <div class="hero-top">
-      <span class="who">${esc(u.profile.display_name)} さん</span>
-      <button class="btn small ghost" data-action="switch-user">利用者を変更</button>
+      <button class="who-pill" data-action="switch-user" aria-label="利用者を変更">
+        <span class="avatar sm">${esc([...u.profile.display_name][0] || '?')}</span>${esc(u.profile.display_name)} さん<span class="who-change">変更</span>
+      </button>
+      <span class="time-pill">⏱ 今日 ${fmtDuration(todayMs)}</span>
     </div>
-    <div class="big-label">覚えた単語</div>
-    <div class="big-number"><span>${sum.masteredWords}</span><small>語</small></div>
-    <div class="big-note">${LANG.name}→日本語（文字あり）で習得済みの単語の数</div>
-    <div class="progress"><div style="width:${pct}%"></div></div>
-    <div class="progress-label">${esc(stage.label)}のうち <b>${stage.mastered}</b> / ${stage.total}語 習得</div>
-    <div class="chips">
-      <span class="chip">日本語→${LANG.name} ${sum.masteredWordsJaEs}語</span>
-      <span class="chip">聞き取り ${sum.masteredWordsListen}語</span>
-      <span class="chip">フレーズ ${sum.masteredPhrases} / ${sum.totalPhrases}</span>
-      ${sum.totalLetters ? `<span class="chip">文字 ${sum.masteredLetters} / ${sum.totalLetters}</span>` : ''}
-      <span class="chip">⏱ 学習時間 合計${fmtDuration(s.studyTotalMs)}（今日${fmtDuration(s.studyDay && s.studyDay.date === todayKey() ? s.studyDay.ms : 0)}）</span>
+    <div class="hero-main">
+      <div class="hero-stat">
+        <div class="big-label">覚えた単語</div>
+        <div class="big-number"><span>${sum.masteredWords}</span><small>語</small></div>
+      </div>
+      <div class="toma-box">
+        <div class="bubble">${toma.text}</div>
+        <img class="toma" src="img/${toma.img}" alt="とーまくん" width="120" height="124">
+      </div>
     </div>
+    <div class="progress"><div style="width:${Math.max(pct, sum.masteredWords ? 2 : 0)}%"></div></div>
+    <div class="progress-label"><span>${esc(stage.label)}のうち <b>${stage.mastered}</b> / ${stage.total}語</span><b>${pct}%</b></div>
+    <div class="stat-grid">
+      <div><b>${sum.masteredWordsJaEs}</b><span>日本語→${esc(LANG.short)}</span></div>
+      <div><b>${sum.masteredWordsListen}</b><span>聞き取り</span></div>
+      <div><b>${sum.masteredPhrases}<small>/${sum.totalPhrases}</small></b><span>フレーズ</span></div>
+      ${sum.totalLetters ? `<div><b>${sum.masteredLetters}<small>/${sum.totalLetters}</small></b><span>文字</span></div>` : ''}
+    </div>
+    <p class="hero-note">覚えた単語＝${esc(LANG.name)}→日本語（文字あり）で習得済みの数。学習時間の合計 ${fmtDuration(s.studyTotalMs)}</p>
   </section>
 
-  <section class="card">
-    <div class="kind-switch">
-      ${seg('lang', s.lang, Object.values(LANGS).map((l) => [l.code, l.name]))}
-      ${seg('kind', cfg.kind, [['word', '単語学習'], ['phrase', '日常フレーズ集'], ...(LANG.letters.length ? [['letter', 'タイ文字']] : [])])}
-      ${seg('homeDir', m.dir, [['es-ja', `${LANG.name}→日本語`], ['ja-es', `日本語→${LANG.name}`]])}
-      ${m.dir === 'mix' ? '<p class="muted small center">いまはミックス（両方向）で出題します</p>' : ''}
-    </div>
+  <section class="card home-card">
+    <div class="home-switch lang-switch">${seg('lang', s.lang, Object.values(LANGS).map((l) => [l.code, `<span class="flag">${LANG_FLAG[l.code] || ''}</span>${l.name}`]))}</div>
+    <div class="home-switch">${seg('kind', cfg.kind, [['word', '単語'], ['phrase', 'フレーズ'], ...(LANG.letters.length ? [['letter', 'タイ文字']] : [])])}</div>
+    <div class="home-switch">${seg('homeDir', m.dir, [['es-ja', `${LANG.name} → 日本語`], ['ja-es', `日本語 → ${LANG.name}`]])}</div>
+    ${m.dir === 'mix' ? '<p class="muted small center">いまはミックス（両方向）で出題します</p>' : ''}
+
+    ${session ? `<button class="btn resume-btn" data-action="resume">
+      <span class="resume-play" aria-hidden="true">▶</span>
+      <span class="resume-text"><b>続きから学習</b><small>${session.answeredCount || 0} / ${session.target}問 回答済み</small></span>
+    </button>` : ''}
     <button class="btn today" data-action="today">
-      <span class="today-title">今日の${s.setSize}問</span>
-      <span class="today-sub">${KIND_LABEL[cfg.kind]}・${dirLabel(m.dir)}・${m.presentation === 'listen' ? '聞き取り' : m.answerMode === 'input' ? '入力式' : '選択式'}</span>
-      <span class="today-sub">復習予定 <b>${due}</b>件${sets ? `　今日 ${sets}セット達成 ✓` : ''}</span>
+      <span class="today-text">
+        <span class="today-title">今日の${s.setSize}問</span>
+        <span class="today-sub">${KIND_LABEL[cfg.kind]}・${dirLabel(m.dir)}</span>
+        <span class="today-badges"><span>${m.presentation === 'listen' ? '聞き取り' : m.answerMode === 'input' ? '入力式' : '選択式'}</span><span>復習 <b>${due}</b>件</span>${sets ? `<span>今日 ${sets}セット ✓</span>` : ''}</span>
+      </span>
+      <img class="today-toma" src="img/toma-walk.webp" alt="" width="84" height="86">
     </button>
-    ${session ? `<button class="btn primary wide" data-action="resume">続きから学習（${session.answeredCount || 0} / ${session.target}問 回答済み）</button>` : ''}
-    <button class="btn wide auto-btn" data-action="auto-open"><span>▶ 自動再生（聞き流し）</span><span class="today-sub">${LANG.name}2回 → 日本語1回・例文つき</span></button>
-    <div class="grid2">
-      <button class="btn" data-action="go" data-to="setup">今日の学習を選ぶ</button>
-      <button class="btn" data-action="unmastered">未習得だけ復習</button>
-      <button class="btn" data-action="go" data-to="list">単語リスト</button>
-      <button class="btn" data-action="go" data-to="phrases">フレーズ集</button>
-      ${LANG.letters.length ? '<button class="btn" data-action="go" data-to="letters">タイ文字の一覧</button>' : ''}
-      <button class="btn ${LANG.letters.length ? '' : 'span2'}" data-action="go" data-to="settings">設定</button>
+
+    <div class="tiles">
+      ${tiles.map(([action, to, icon, label, sub], i) => `
+        <button class="tile${tiles.length % 2 && i === tiles.length - 1 ? ' span2' : ''}" data-action="${action}"${to ? ` data-to="${to}"` : ''}>
+          <span class="tile-icon" aria-hidden="true">${icon}</span>
+          <span class="tile-text"><b>${label}</b><small>${sub}</small></span>
+        </button>`).join('')}
     </div>
-    <button class="btn ghost wide" data-action="a2hs">ホーム画面に追加する方法</button>
+    <button class="btn ghost wide small" data-action="a2hs">ホーム画面に追加する方法</button>
   </section>`;
+}
+
+// ホームのとーまくんのひとこと（状況に合わせて変える）
+const LANG_FLAG = { es: '🇦🇷', th: '🇹🇭', en: '🇺🇸' };
+const LANG_HELLO = { es: '¡Hola!', th: 'สวัสดี!', en: 'Hello!' };
+function tomaSays({ name, session, sets, due }) {
+  const hello = `<span class="hello" lang="${LANG.code}">${LANG_HELLO[LANG.code] || ''}</span>`;
+  if (session) return { img: 'toma-wait.webp', text: `${hello}続きから やろう！<br>あと${Math.max(0, session.target - (session.answeredCount || 0))}問だよ` };
+  if (sets >= 2) return { img: 'toma-joy.webp', text: `今日は${sets}セットも<br>できたね！すごい！` };
+  if (sets === 1) return { img: 'toma-joy.webp', text: '今日の1セット<br>できたね！' };
+  if (due > 0) return { img: 'toma-wait.webp', text: `${hello}復習が<br>${due}件 まってるよ` };
+  return { img: 'toma.svg', text: `${hello}${esc(name)}さん、<br>いっしょにがんばろう！` };
 }
 
 // ---------- 学習の設定（今日の学習を選ぶ） ----------
@@ -537,7 +573,8 @@ function screenQuiz() {
       : '<button class="btn ghost wide" data-action="dont-know">わからない</button>') : ''}
     ${revealed ? feedback(q) : ''}
   </section>
-  ${revealed ? actionBar(q) : ''}`;
+  ${revealed ? actionBar(q) : `
+  <button class="btn ok wide mastered-skip" data-action="mark-mastered">✓ 習得済み<span>もう覚えている（押すと覚えた${KIND_LABEL[entry.kind]}に入り、次の問題へ）</span></button>`}`;
 }
 
 // 回答後の操作は画面下に固定し、スクロールしなくても押せるようにする
@@ -546,7 +583,7 @@ function actionBar(q) {
     ? `<button class="btn ok" data-action="self-judge" data-value="correct">正解として記録</button>
        <button class="btn" data-action="self-judge" data-value="wrong">復習に回す</button>`
     : `<button class="btn big" data-action="rate" data-value="notyet">まだ覚えていない</button>
-       <button class="btn primary big" data-action="rate" data-value="known">覚えた</button>`;
+       <button class="btn primary big" data-action="rate" data-value="known">ほぼ覚えた</button>`;
   return `<div class="action-bar"><div class="action-inner">${inner}</div></div>`;
 }
 
@@ -660,7 +697,7 @@ function screenResult() {
   const missed = [...new Set(firstTries.filter((l) => l.result !== 'correct').map((l) => l.id))];
   return `
   <section class="card center">
-    <div class="sun-big" aria-hidden="true"></div>
+    <img class="result-toma" src="img/toma-joy.webp" alt="" width="120" height="124">
     <h1 class="title">おつかれさまでした！</h1>
     <div class="score"><b>${correct}</b> / ${firstTries.length} 問 正解</div>
     <p class="muted">今回学習した${KIND_LABEL[r.session.cfg.kind]}：${seen.size}　｜　この範囲の残りの復習：${r.due}件</p>
@@ -696,14 +733,17 @@ function screenList() {
     <h1 class="title">単語リスト</h1>
     ${seg('list-scope', scope, [...WORD_STAGES.map((s) => [String(s.id), s.label]), ['all', 'すべて']])}
     ${seg('list-filter', filter, [['all', 'すべて'], ['new', '未学習'], ['learning', '学習中'], ['mastered', '習得済み'], ['unmastered', '未習得']])}
-    <p class="muted small">状態は「${LANG.name}→日本語（文字あり）」の結果です。「未習得」は未学習と学習中の両方を含みます。${rows.length}語</p>
+    <p class="muted small">状態は「${LANG.name}→日本語（文字あり）」の結果です。「未習得」は未学習と学習中の両方を含みます。もう知っている単語は「習得済みにする」を押すと、覚えた単語に入ります。${rows.length}語</p>
     <ul class="word-list">
       ${rows.map(({ w, st }) => `
         <li>
           <button class="icon-btn" data-action="play" data-id="${w.id}" aria-label="発音">🔊</button>
           <div class="wl-main"><div class="es">${esWithArticle(w)}</div>${ipaLine(w)}<div class="ja">${esc(w.ja)}</div>${exampleBlock(w, { compact: true })}</div>
           <div class="wl-side"><span class="badge ${st}">${STATUS_LABEL[st]}</span>
-            <span class="mini">${ja(w) ? `日→${LANG.short}✓` : ''} ${li(w) ? '聞✓' : ''}</span></div>
+            <span class="mini">${ja(w) ? `日→${LANG.short}✓` : ''} ${li(w) ? '聞✓' : ''}</span>
+            ${st === 'mastered'
+              ? `<button class="mark-btn undo" data-action="list-mastered" data-id="${w.id}" data-value="off">取り消す</button>`
+              : `<button class="mark-btn" data-action="list-mastered" data-id="${w.id}" data-value="on">✓ 習得済み<br>にする</button>`}</div>
         </li>`).join('')}
     </ul>
   </section>`;
@@ -1183,7 +1223,7 @@ function render() {
 // 画面上部の固定バー：ホーム以外の画面では、アプリ名の代わりに「ホームへ戻る」ボタンを出す
 function renderHeader() {
   document.title = `はじめの${LANG.name}`;
-  if (['home', 'users', 'passcode'].includes(ui.screen)) { $brand.innerHTML = `<span class="sun" aria-hidden="true"></span><span>はじめの${LANG.name}</span>`; return; }
+  if (['home', 'users', 'passcode'].includes(ui.screen)) { $brand.innerHTML = `<img class="brand-toma" src="img/toma.svg" alt="" width="26" height="34"><span>はじめの${LANG.name}</span>`; return; }
   const label = me() ? '← ホーム' : '← もどる';
   $brand.innerHTML = `<button class="btn small back home-nav" data-action="home-nav">${label}</button>`;
 }
@@ -1304,7 +1344,7 @@ const actions = {
     if (!q || !q.pending) return;
     // 発音は「確認待ち」を表示したときに読み上げ済みなので、ここでは効果音だけ
     commitAnswer(el.dataset.value === 'correct' ? 'correct' : 'wrong', { judgedBy: 'self', speak: false });
-    // 自分で判定したので、「覚えた／まだ覚えていない」は聞かずに次の問題へ
+    // 自分で判定したので、「ほぼ覚えた／まだ覚えていない」は聞かずに次の問題へ
     ui.q.rated = true;
     nextQuestion();
   },
@@ -1312,6 +1352,42 @@ const actions = {
   'home-nav': () => {
     if (ui.screen === 'quiz') return actions.quit();
     go(me() ? 'home' : 'users');
+  },
+  // 「習得済み」（回答する前に押す）：この問題の向きと「外国語→日本語（文字あり）」の両方を習得済みにして、
+  // 覚えた単語に入れる。1問答えたものとして数え、次の問題へ進む
+  'mark-mastered': () => {
+    const q = ui.q;
+    const u = me();
+    const sn = u?.session;
+    if (!q || q.answered || q.pending || !sn || sn.id !== q.sessionId || sn.pos !== q.index) return;
+    q.answered = true;
+    q.done = true;
+    stopCountdown();
+    sp.stopListening();
+    sp.stopSpeaking();
+    const { entry, item } = q;
+    const key = stateKey(entry.kind, entry.id, entry.dir, entry.mode);
+    for (const k of new Set([key, stateKey(entry.kind, entry.id, 'es-ja', 'text')])) {
+      store.updateState(u.profile.user_id, k, applyMastered(u.states[k]));
+    }
+    sn.firstDone[key] = true;
+    sn.answeredCount++;
+    sn.log.push({ id: item.id, kind: item.kind, dir: entry.dir, result: 'correct', mastered: true });
+    sn.pos++;
+    store.saveSession(u.profile.user_id, sn);
+    toast(`「${item.es}」を習得済みにしました`, 2000);
+    nextQuestion();
+  },
+  // 単語リストの「習得済みにする／取り消す」（外国語→日本語（文字あり）の状態を変える）
+  'list-mastered': (el) => {
+    const u = me();
+    const item = getItem(el.dataset.id);
+    if (!u || !item) return;
+    const key = stateKey(item.kind, item.id, 'es-ja', 'text');
+    const next = el.dataset.value === 'off' ? applyNotYet(u.states[key]) : applyMastered(u.states[key]);
+    store.updateState(u.profile.user_id, key, next);
+    store.syncNow().catch(() => {});
+    render();
   },
   // 回答後の自己評価。どちらを押しても次の問題へ進む
   rate: (el) => {

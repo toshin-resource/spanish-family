@@ -249,6 +249,22 @@ export function applyNotYet(prev, { today = todayKey(), now = Date.now() } = {})
   };
 }
 
+// 「習得済み」ボタン：本人が覚えたと決めた語を、すぐ習得済みにする。復習は2週間後に1回だけ出す
+export function applyMastered(prev, { today = todayKey(), now = Date.now() } = {}) {
+  const s = { ...(prev || newState()) };
+  const step = Math.max(s.step || 0, 4);
+  return {
+    ...s,
+    status: 'mastered',
+    retryAtSet: 0,
+    streak: Math.max(s.streak || 0, RULES.masteryStreak),
+    step,
+    lastStepDay: today,
+    next: addDays(today, RULES.intervalsDays[step - 1]),
+    updatedAt: now,
+  };
+}
+
 export function isDue(state, today = todayKey()) {
   return !!(state && state.next && state.next <= today);
 }
