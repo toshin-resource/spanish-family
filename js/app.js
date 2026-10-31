@@ -710,7 +710,13 @@ function screenResult() {
   const seen = new Map();
   for (const l of r.session.log) seen.set(l.id, l.retry && seen.has(l.id) ? seen.get(l.id) : l);
   const missed = [...new Set(firstTries.filter((l) => l.result !== 'correct').map((l) => l.id))];
+  // 次の操作は画面の上に固定し、スクロールしなくても押せるようにする
   return `
+  <div class="result-actions">
+    ${missed.length ? `<button class="btn" data-action="retry-missed">間違えた${missed.length}問を<br>もう一度</button>` : ''}
+    <button class="btn primary" data-action="today">もう1セット<br>学習する</button>
+    <button class="btn" data-action="go" data-to="home">ホームへ</button>
+  </div>
   <section class="card center">
     ${fun() ? `<img class="result-toma" src="img/${firstTries.length && correct / firstTries.length >= 0.8 ? 'st-omedeto' : 'st-otsukare'}.webp" alt="" width="140" height="140">` : '<div class="sun-big" aria-hidden="true"></div>'}
     <h1 class="title">おつかれさまでした！</h1>
@@ -727,9 +733,6 @@ function screenResult() {
           <button class="icon-btn" data-action="play" data-id="${esc(it.id)}" aria-label="発音">🔊</button></li>`;
       }).join('')}
     </ul>
-    ${missed.length ? `<button class="btn primary wide" data-action="retry-missed">間違えた${missed.length}問をもう一度</button>` : ''}
-    <button class="btn wide" data-action="today">もう1セット学習する</button>
-    <button class="btn ghost wide" data-action="go" data-to="home">ホームへ</button>
   </section>`;
 }
 

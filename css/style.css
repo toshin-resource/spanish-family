@@ -449,3 +449,13 @@ body[data-screen="quiz"] { padding-bottom: calc(124px + env(safe-area-inset-bott
 .auto-setup .seg button { min-width: 0; }
 .auto-start { margin-top: 16px; min-height: 64px; font-size: 1.2rem; font-weight: 800; }
 .auto-opts summary { cursor: pointer; font-weight: 700; color: var(--celeste-deep); padding: 6px 0; }
+
+/* ---- 結果画面：次の操作を上に固定 ---- */
+.result-actions {
+  position: sticky; top: calc(64px + env(safe-area-inset-top, 0px)); z-index: 8;
+  display: flex; gap: 8px; margin: 0 -16px; padding: 8px 16px;
+  background: rgba(243, 248, 253, 0.96); box-shadow: 0 1px 0 var(--line);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.result-actions .btn { flex: 1 1 0; min-width: 0; margin: 0; min-height: 58px; padding: 6px 4px; font-size: 0.95rem; font-weight: 800; line-height: 1.25; }
+.result-actions .btn:not(.primary) { border-width: 2px; border-color: var(--celeste); color: var(--celeste-deep); }
