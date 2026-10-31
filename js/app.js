@@ -1020,22 +1020,29 @@ const AUTO_NEXT_MS = 1500; // 次の語へ進む前
 
 function autoKey(s = settings()) {
   const cfg = homeCfg(s);
-  return [LANG.code, cfg.kind, cfg.scope, s.autoTarget, s.autoOrder].join('|');
+  return [LANG.code, cfg.kind, cfg.scope, s.autoTarget, s.autoOrder, s.autoCount].join('|');
 }
+// 再生する語の並び：範囲（レベル）→ 対象（全部・未習得・習得済み）→ 順番 → 語数
 function buildAuto() {
   const s = settings();
   const cfg = homeCfg(s);
   let items = scopeItems(cfg.kind, cfg.scope, LANG.code);
-  if (s.autoTarget === 'unmastered') items = items.filter((it) => itemStatus(me().states, it) !== 'mastered');
+  const st = (it) => itemStatus(me().states, it);
+  if (s.autoTarget === 'unmastered') items = items.filter((it) => st(it) !== 'mastered');
+  if (s.autoTarget === 'mastered') items = items.filter((it) => st(it) === 'mastered');
   if (s.autoOrder === 'random') {
     items = [...items];
     for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+  } else {
+    // 順番どおりのときは、前回止めた語から続ける
+    const at = items.findIndex((it) => it.id === (s.autoPos || {})[autoKey(s)]);
+    if (at > 0) items = [...items.slice(at), ...items.slice(0, at)];
   }
+  const count = Number(s.autoCount);
+  if (count > 0) items = items.slice(0, count);
   auto.key = autoKey(s);
   auto.items = items;
-  // 順番どおりのときは、前回止めた語から続ける
-  const saved = s.autoOrder === 'random' ? '' : (s.autoPos || {})[auto.key];
-  auto.pos = Math.max(0, items.findIndex((it) => it.id === saved));
+  auto.pos = 0;
 }
 const autoWait = (ms) => new Promise((ok) => setTimeout(ok, ms));
 function stopAuto() {
@@ -1122,6 +1129,21 @@ function screenAutoplay() {
   }
   const { opts, name } = scopeOptions(cfg.kind);
   const it = auto.items[auto.pos];
+  const kinds = [['word', '単語'], ['phrase', 'フレーズ'], ...(LANG.letters.length ? [['letter', 'タイ文字']] : [])];
+  const unit = cfg.kind === 'word' ? '語' : cfg.kind === 'letter' ? '文字' : '件';
+  const options = `
+      <label class="field-label">内容</label>
+      ${seg('kind', cfg.kind, kinds)}
+      <label class="field-label">${cfg.kind === 'word' ? 'レベル' : '範囲'}</label>
+      ${seg(name, cfg.scope, opts)}
+      <label class="field-label">対象</label>
+      ${seg('autoTarget', s.autoTarget, [['all', '全部'], ['unmastered', '未習得'], ['mastered', '習得済み']])}
+      <label class="field-label">何${unit}</label>
+      ${seg('autoCount', String(s.autoCount), [['10', '10'], ['20', '20'], ['30', '30'], ['50', '50'], ['100', '100'], ['0', '全部']])}
+      <label class="field-label">順番</label>
+      ${seg('autoOrder', s.autoOrder, [['order', '順番どおり'], ['random', 'ランダム']])}
+      <label class="field-label">例文の読み上げ</label>
+      ${seg('autoExample', s.autoExample, [['show', '表示だけ'], ['read', '例文も読む']])}`;
   const ph = auto.playing ? auto.phase : '';
   const card = it ? `
     <div class="auto-card">
@@ -1131,6 +1153,24 @@ function screenAutoplay() {
       <div class="auto-ja ${ph === 'ja' ? 'now' : ''}">${esc(it.ja)}</div>
       ${it.example ? `<div class="auto-ex ${ph === 'ex' ? 'now' : ''}">${exampleBlock(it)}</div>` : ''}
     </div>` : `<p class="muted center">この条件の${KIND_LABEL[cfg.kind]}がありません。範囲や対象を変えてください。</p>`;
+  if (!auto.playing) {
+    return `
+  <section class="card auto-setup">
+    <h1 class="title">🎧 自動再生（聞き流し）</h1>
+    <p class="muted small">${LANG.name}を2回 → 日本語を1回読み、単語・意味・例文を表示して次へ進みます。</p>
+    ${options}
+    <button class="btn primary wide big auto-start" data-action="auto-toggle" ${auto.items.length ? '' : 'disabled'}>▶ ${auto.items.length}${unit}を再生</button>
+    ${auto.items.length ? '' : `<p class="alert small">この条件の${KIND_LABEL[cfg.kind]}がありません。レベルや対象を変えてください。</p>`}
+  </section>
+  ${it ? `<section class="card auto">
+    ${card}
+    <div class="auto-controls">
+      <button class="btn" data-action="auto-prev">⏮ 前へ</button>
+      <button class="btn primary" data-action="auto-toggle">▶ 再生</button>
+      <button class="btn" data-action="auto-next">次へ ⏭</button>
+    </div>
+  </section>` : ''}`;
+  }
   return `
   <section class="card auto">
     ${card}
@@ -1139,17 +1179,10 @@ function screenAutoplay() {
       <button class="btn primary" data-action="auto-toggle">${auto.playing ? '⏸ 一時停止' : '▶ 再生'}</button>
       <button class="btn" data-action="auto-next">次へ ⏭</button>
     </div>
-    <p class="muted small center">${LANG.name}を2回 → 日本語を1回読み、次へ進みます。最後まで行くと最初に戻ります。</p>
+    <p class="muted small center">${LANG.name}を2回 → 日本語を1回読み、次へ進みます。${auto.items.length}${unit}の最後まで行くと最初に戻ります。</p>
     <details class="auto-opts">
       <summary>再生の設定</summary>
-      <label class="field-label">範囲</label>
-      ${seg(name, cfg.scope, opts)}
-      <label class="field-label">対象</label>
-      ${seg('autoTarget', s.autoTarget, [['all', '全部'], ['unmastered', '未習得のみ']])}
-      <label class="field-label">順番</label>
-      ${seg('autoOrder', s.autoOrder, [['order', '順番どおり'], ['random', 'シャッフル']])}
-      <label class="field-label">例文の読み上げ</label>
-      ${seg('autoExample', s.autoExample, [['show', '表示だけ'], ['read', '例文も読む']])}
+      ${options}
     </details>
   </section>`;
 }
@@ -1325,9 +1358,9 @@ const actions = {
   },
   'play-q': () => playQuestion(),
   'auto-open': () => {
-    sp.primeSpeech(LANG.code);
+    auto.key = ''; // 開くたびに並びを作り直す（ランダムのときは毎回ちがう順番）
+    auto.items = [];
     go('autoplay');
-    startAuto();
   },
   'auto-toggle': () => {
     if (auto.playing) { stopAuto(); render(); } else startAuto();

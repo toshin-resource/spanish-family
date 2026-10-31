@@ -25,7 +25,7 @@ export const DEFAULT_SETTINGS = {
   answerSeconds: 5, // 答えるまでの時間（秒）。過ぎたら答えを表示。0 = 制限なし（「わからない」ボタンを出す）
   autoSpeakQuestion: 'on', // 問題を表示して1秒後に読み上げる（外国語が表示される問題だけ）
   autoSpeak: 'on', // 回答したら発音を読み上げる
-  sfx: 'on', toma: 'on', hideChoices: 'off', enIpa: 'on', autoTarget: 'all', autoOrder: 'order', autoExample: 'show', // 正解のときに効果音を鳴らす
+  sfx: 'on', toma: 'on', hideChoices: 'off', enIpa: 'on', autoTarget: 'all', autoOrder: 'order', autoCount: '20', autoExample: 'show', // 正解のときに効果音を鳴らす
 };
 
 function fresh() {

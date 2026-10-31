@@ -446,4 +446,6 @@ body[data-screen="quiz"] { padding-bottom: calc(124px + env(safe-area-inset-bott
 .auto-controls { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 8px; margin-top: 14px; }
 .auto-controls .btn { margin: 0; min-height: 64px; font-size: 1.05rem; font-weight: 800; white-space: nowrap; padding: 0 6px; }
 .auto-opts { margin-top: 10px; }
+.auto-setup .seg button { min-width: 0; }
+.auto-start { margin-top: 16px; min-height: 64px; font-size: 1.2rem; font-weight: 800; }
 .auto-opts summary { cursor: pointer; font-weight: 700; color: var(--celeste-deep); padding: 6px 0; }
