@@ -506,6 +506,24 @@ function playQuestion(repeat = 1) {
     });
 }
 
+// 日本語→外国語の問題で、主な意味の下に出すほかの意味（最大3つ）。
+// 漢字の語の読みがなだけのもの（左 → ひだり）は意味ではないので出さない
+function otherMeanings(item) {
+  if (item.kind === 'letter') return [];
+  const plain = (t) => t.replace(/（[^）]*）/g, '').trim();
+  const main = plain(item.ja);
+  const hasKanji = /[一-鿿]/.test(main);
+  const out = [];
+  for (const a of item.accepted.slice(1)) {
+    const t = plain(a);
+    if (!t || t === main || out.includes(t)) continue;
+    if (hasKanji && /^[぀-ゟーー]+$/.test(t)) continue;
+    out.push(t);
+    if (out.length === 3) break;
+  }
+  return out;
+}
+
 function screenQuiz() {
   const sn = me().session;
   if (!sn) return screenHome();
@@ -546,6 +564,7 @@ function screenQuiz() {
   } else {
     prompt = `
       <div class="prompt-ja${item.ja.length > 9 ? ' long' : ''}">${esc(item.ja)}</div>
+      ${otherMeanings(item).length ? `<div class="prompt-ja-more">ほかの意味：${otherMeanings(item).map(esc).join('・')}</div>` : ''}
       ${ipaLine(item, { withIpa: false })}
       ${revealed || item.kind === 'letter' ? '' : '<p class="muted small center">選択肢の 🔊 で発音を聞けます。</p>'}`;
   }
