@@ -131,7 +131,7 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 .big-number { font-size: 4.6rem; font-weight: 800; line-height: 1; letter-spacing: -0.03em; color: var(--celeste-deep); }
 .big-number small { font-size: 1.4rem; margin-left: 4px; color: var(--ink); letter-spacing: 0; }
 .toma-box { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-end; }
-.toma { width: 112px; height: auto; margin-right: -4px; filter: drop-shadow(0 6px 8px rgba(44, 106, 160, 0.18)); animation: toma-bob 3.2s ease-in-out infinite; }
+.toma { width: auto; height: 128px; margin-right: 4px; filter: drop-shadow(0 6px 8px rgba(44, 106, 160, 0.18)); animation: toma-bob 3.2s ease-in-out infinite; }
 @keyframes toma-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 .bubble {
   position: relative; align-self: stretch; margin: 0 0 8px 6px; padding: 8px 12px; border-radius: 16px;
@@ -178,7 +178,7 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 .today-sub { font-size: 0.82rem; font-weight: 700; }
 .today-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .today-badges span { background: rgba(255, 255, 255, 0.7); border-radius: 99px; padding: 2px 10px; font-size: 0.8rem; font-weight: 700; }
-.today-toma { width: 84px; height: auto; flex: none; }
+.today-toma { width: auto; height: 92px; flex: none; margin-right: 6px; transform: rotate(4deg); }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .tile {
   display: flex; align-items: center; gap: 8px; min-height: 64px; padding: 8px 8px; border-radius: 16px;
@@ -193,7 +193,7 @@ input:focus, select:focus, .btn:focus-visible { outline: 3px solid rgba(116, 172
 .tile-text b { font-size: 0.98rem; white-space: nowrap; }
 .tile-text small { font-size: 0.72rem; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand-toma { height: 34px; width: auto; margin: -4px 0; }
-.result-toma { display: block; width: 120px; height: auto; margin: 0 auto 6px; }
+.result-toma { display: block; width: auto; height: 128px; margin: 0 auto 6px; }
 @media (prefers-reduced-motion: reduce) { .toma { animation: none; } }
 
 /* ---- 学習画面 ---- */
@@ -337,7 +337,7 @@ details summary { cursor: pointer; margin-top: 10px; font-weight: 600; color: va
 @media (max-width: 360px) {
   .big-number { font-size: 3.8rem; }
   .grid2 { grid-template-columns: 1fr; }
-  .toma { width: 92px; }
+  .toma { height: 108px; }
   .home-switch .seg button { font-size: 0.84rem; }
   .tile-icon { width: 34px; height: 34px; font-size: 1.1rem; }
 }

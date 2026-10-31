@@ -245,7 +245,7 @@ function screenHome() {
       </div>
       <div class="toma-box">
         <div class="bubble">${toma.text}</div>
-        <img class="toma" src="img/${toma.img}" alt="とーまくん" width="120" height="124">
+        <img class="toma" src="img/${toma.img}" alt="とーまくん" width="96" height="128">
       </div>
     </div>
     <div class="progress"><div style="width:${Math.max(pct, sum.masteredWords ? 2 : 0)}%"></div></div>
@@ -275,7 +275,7 @@ function screenHome() {
         <span class="today-sub">${KIND_LABEL[cfg.kind]}・${dirLabel(m.dir)}</span>
         <span class="today-badges"><span>${m.presentation === 'listen' ? '聞き取り' : m.answerMode === 'input' ? '入力式' : '選択式'}</span><span>復習 <b>${due}</b>件</span>${sets ? `<span>今日 ${sets}セット ✓</span>` : ''}</span>
       </span>
-      <img class="today-toma" src="img/toma-walk.webp" alt="" width="84" height="86">
+      <img class="today-toma" src="img/toma-stand.webp" alt="" width="66" height="86">
     </button>
 
     <div class="tiles">
@@ -294,11 +294,11 @@ const LANG_FLAG = { es: '🇦🇷', th: '🇹🇭', en: '🇺🇸' };
 const LANG_HELLO = { es: '¡Hola!', th: 'สวัสดี!', en: 'Hello!' };
 function tomaSays({ name, session, sets, due }) {
   const hello = `<span class="hello" lang="${LANG.code}">${LANG_HELLO[LANG.code] || ''}</span>`;
-  if (session) return { img: 'toma-wait.webp', text: `${hello}続きから やろう！<br>あと${Math.max(0, session.target - (session.answeredCount || 0))}問だよ` };
-  if (sets >= 2) return { img: 'toma-joy.webp', text: `今日は${sets}セットも<br>できたね！すごい！` };
-  if (sets === 1) return { img: 'toma-joy.webp', text: '今日の1セット<br>できたね！' };
-  if (due > 0) return { img: 'toma-wait.webp', text: `${hello}復習が<br>${due}件 まってるよ` };
-  return { img: 'toma.svg', text: `${hello}${esc(name)}さん、<br>いっしょにがんばろう！` };
+  if (session) return { img: 'toma-wave.webp', text: `${hello}続きから やろう！<br>あと${Math.max(0, session.target - (session.answeredCount || 0))}問だよ` };
+  if (sets >= 2) return { img: 'toma-stand.webp', text: `今日は${sets}セットも<br>できたね！すごい！` };
+  if (sets === 1) return { img: 'toma-stand.webp', text: '今日の1セット<br>できたね！' };
+  if (due > 0) return { img: 'toma-bow.webp', text: `${hello}復習が${due}件<br>まってるよ。おねがい！` };
+  return { img: 'toma-wave.webp', text: `${hello}${esc(name)}さん、<br>いっしょにがんばろう！` };
 }
 
 // ---------- 学習の設定（今日の学習を選ぶ） ----------
@@ -697,7 +697,7 @@ function screenResult() {
   const missed = [...new Set(firstTries.filter((l) => l.result !== 'correct').map((l) => l.id))];
   return `
   <section class="card center">
-    <img class="result-toma" src="img/toma-joy.webp" alt="" width="120" height="124">
+    <img class="result-toma" src="img/toma-wave.webp" alt="" width="92" height="124">
     <h1 class="title">おつかれさまでした！</h1>
     <div class="score"><b>${correct}</b> / ${firstTries.length} 問 正解</div>
     <p class="muted">今回学習した${KIND_LABEL[r.session.cfg.kind]}：${seen.size}　｜　この範囲の残りの復習：${r.due}件</p>
@@ -1223,7 +1223,7 @@ function render() {
 // 画面上部の固定バー：ホーム以外の画面では、アプリ名の代わりに「ホームへ戻る」ボタンを出す
 function renderHeader() {
   document.title = `はじめの${LANG.name}`;
-  if (['home', 'users', 'passcode'].includes(ui.screen)) { $brand.innerHTML = `<img class="brand-toma" src="img/toma.svg" alt="" width="26" height="34"><span>はじめの${LANG.name}</span>`; return; }
+  if (['home', 'users', 'passcode'].includes(ui.screen)) { $brand.innerHTML = `<img class="brand-toma" src="img/toma-stand.webp" alt="" width="26" height="34"><span>はじめの${LANG.name}</span>`; return; }
   const label = me() ? '← ホーム' : '← もどる';
   $brand.innerHTML = `<button class="btn small back home-nav" data-action="home-nav">${label}</button>`;
 }
